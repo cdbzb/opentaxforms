@@ -1,0 +1,13 @@
+
+ RUN  v3.2.4 /private/tmp/opentaxforms-reuse/opentax
+
+ ✓ tests/rules/form1040-full.test.ts (94 tests) 4ms
+ ✓ tests/rules/form1040-income.test.ts (37 tests) 3ms
+ ✓ tests/rules/scheduleD.test.ts (29 tests) 3ms
+ ✓ tests/rules/engine.test.ts (51 tests) 10ms
+
+ Test Files  4 passed (4)
+      Tests  211 passed (211)
+   Start at  14:58:15
+   Duration  674ms (transform 505ms, setup 0ms, collect 794ms, tests 20ms, environment 0ms, prepare 114ms)
+

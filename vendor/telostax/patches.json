@@ -1,0 +1,14 @@
+{
+  "engine/scheduleD.ts": {
+    "kind": "modified",
+    "sha256": "2eb85f0392a321c8335e593235b11caebea0404c4efaf0e654380e9727096562"
+  },
+  "engine/form1040Sections.ts": {
+    "kind": "modified",
+    "sha256": "afe06a8f5ac46112e90ff35bedd6efbf1930e84cc6324650e814839404ab1516"
+  },
+  "engine/capitalLossCarryover.ts": {
+    "kind": "added",
+    "sha256": "b68b9683bbdffdca074c80688686034021fc44461b4a24d0c62899790714e23c"
+  }
+}

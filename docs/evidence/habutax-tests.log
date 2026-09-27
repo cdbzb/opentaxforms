@@ -1,0 +1,64 @@
+/private/tmp/opentaxforms-reuse/habutax/habutax/forms/ty2021/f1040.py:92: SyntaxWarning: "\-" is an invalid escape sequence. Such sequences will not work in the future. Did you mean "\\-"? A raw string is also an option.
+  RegexInput('account_number', '^[0-9A-Za-z\-]{1,17}$', description="What is the account number of the account in your name into which you want your refund deposited?"),
+/private/tmp/opentaxforms-reuse/habutax/habutax/forms/ty2022/f1040.py:100: SyntaxWarning: "\-" is an invalid escape sequence. Such sequences will not work in the future. Did you mean "\\-"? A raw string is also an option.
+  RegexInput('account_number', '^[0-9A-Za-z\-]{1,17}$', description="What is the account number of the account in your name into which you want your refund deposited?"),
+/private/tmp/opentaxforms-reuse/habutax/habutax/forms/ty2023/f1040.py:154: SyntaxWarning: "\-" is an invalid escape sequence. Such sequences will not work in the future. Did you mean "\\-"? A raw string is also an option.
+  RegexInput('account_number', '^[0-9A-Za-z\-]{1,17}$', description="What is the account number of the account in your name into which you want your refund deposited?"),
+test_form0000_example (tests.test_documentation.DocumentationTestCase.test_form0000_example) ... ok
+test_formsomething_example (tests.test_documentation.DocumentationTestCase.test_formsomething_example) ... ok
+test_fthresholds_example (tests.test_documentation.DocumentationTestCase.test_fthresholds_example) ... ok
+test_enum_make (tests.test_enum.EnumTestCase.test_enum_make) ... ok
+test_boolean_field (tests.test_fields.FieldTestCase.test_boolean_field) ... ok
+test_float_field (tests.test_fields.FieldTestCase.test_float_field) ... ok
+test_float_field_rounding (tests.test_fields.FieldTestCase.test_float_field_rounding) ... ok
+test_integer_field (tests.test_fields.FieldTestCase.test_integer_field) ... ok
+test_not_implemented (tests.test_fields.FieldTestCase.test_not_implemented) ... ok
+test_string_field (tests.test_fields.FieldTestCase.test_string_field) ... ok
+test_type_error (tests.test_fields.FieldTestCase.test_type_error) ... ok
+test_boolean_input (tests.test_inputs.InputTestCase.test_boolean_input) ... ok
+test_enum_input (tests.test_inputs.InputTestCase.test_enum_input) ... ok
+test_float_input (tests.test_inputs.InputTestCase.test_float_input) ... ok
+test_integer_input (tests.test_inputs.InputTestCase.test_integer_input) ... ok
+test_regex_input (tests.test_inputs.InputTestCase.test_regex_input) ... ok
+test_ssn_input (tests.test_inputs.InputTestCase.test_ssn_input) ... ok
+test_string_input (tests.test_inputs.InputTestCase.test_string_input) ... ok
+test_add_unmet (tests.test_solver.DependencyTrackerTestCase.test_add_unmet) ... ok
+test_meet (tests.test_solver.DependencyTrackerTestCase.test_meet) ... ok
+test_met_dependents (tests.test_solver.DependencyTrackerTestCase.test_met_dependents) ... ok
+test_basic_form (tests.test_solver.SolverTestCase.test_basic_form) ... ok
+test_basic_form_missing_input (tests.test_solver.SolverTestCase.test_basic_form_missing_input) ... ok
+test_sort_keys_different_forms (tests.test_solver.SortOrderTestCase.test_sort_keys_different_forms) ... ok
+test_sort_keys_mixed_form_presence (tests.test_solver.SortOrderTestCase.test_sort_keys_mixed_form_presence) ... ok
+test_sort_keys_mixed_types (tests.test_solver.SortOrderTestCase.test_sort_keys_mixed_types) ... ok
+test_sort_keys_no_form (tests.test_solver.SortOrderTestCase.test_sort_keys_no_form) ... ok
+test_sort_keys_same_form (tests.test_solver.SortOrderTestCase.test_sort_keys_same_form) ... ok
+test_figure_2021_1040_tax (tests.ty2021.test_2021_tax_tables.FigureTaxTestCase.test_figure_2021_1040_tax) ... ok
+test_simple_1040 (tests.ty2021.test_f1040.Form1040SimpleTestCase.test_simple_1040) ... ok
+test_1040_s1 (tests.ty2021.test_f1040_s1.Form1040S1TestCase0.test_1040_s1) ... ok
+test_1040_s1 (tests.ty2021.test_f1040_s1.Form1040S1TestCase1.test_1040_s1) ... ok
+test_1040_s1 (tests.ty2021.test_f1040_s1.Form1040S1TestCase1_both_hsa.test_1040_s1) ... ok
+test_1040_s1 (tests.ty2021.test_f1040_s1.Form1040S1TestCase1_no_hsa.test_1040_s1) ... ok
+test_1040_s1 (tests.ty2021.test_f1040_s1.Form1040S1TestCase1_spouse_hsa.test_1040_s1) ... ok
+test_1040_s1 (tests.ty2021.test_f1040_s1.Form1040S1TestCase1_you_hsa.test_1040_s1) ... ok
+test_1040_s3 (tests.ty2021.test_f1040_s3.Form1040S3TestCase.test_1040_s3) ... ok
+test_1040_s3 (tests.ty2021.test_f1040_s3.Form1040S3TestCaseTooManyForeignTaxesMFJ.test_1040_s3) ... ok
+test_1040_s3 (tests.ty2021.test_f1040_s3.Form1040S3TestCaseTooManyForeignTaxesSingle.test_1040_s3) ... ok
+test_simple_w2 (tests.ty2021.test_fw_2.FormW2TestCase.test_simple_w2) ... ok
+test_figure_2022_1040_tax (tests.ty2022.test_2022_tax_tables.FigureTaxTestCase.test_figure_2022_1040_tax) ... ok
+test_figure_2022_1040_tax_monotonically_increasing (tests.ty2022.test_2022_tax_tables.FigureTaxTestCase.test_figure_2022_1040_tax_monotonically_increasing) ... ok
+test_simple_1040 (tests.ty2022.test_f1040.Form1040SimpleTestCase.test_simple_1040) ... ok
+test_1040_s1 (tests.ty2022.test_f1040_s1.Form1040S1TestCase0.test_1040_s1) ... ok
+test_1040_s1 (tests.ty2022.test_f1040_s1.Form1040S1TestCase1.test_1040_s1) ... ok
+test_1040_s1 (tests.ty2022.test_f1040_s1.Form1040S1TestCase1_both_hsa.test_1040_s1) ... ok
+test_1040_s1 (tests.ty2022.test_f1040_s1.Form1040S1TestCase1_no_hsa.test_1040_s1) ... ok
+test_1040_s1 (tests.ty2022.test_f1040_s1.Form1040S1TestCase1_spouse_hsa.test_1040_s1) ... ok
+test_1040_s1 (tests.ty2022.test_f1040_s1.Form1040S1TestCase1_you_hsa.test_1040_s1) ... ok
+test_1040_s3 (tests.ty2022.test_f1040_s3.Form1040S3TestCase.test_1040_s3) ... ok
+test_1040_s3 (tests.ty2022.test_f1040_s3.Form1040S3TestCaseTooManyForeignTaxesMFJ.test_1040_s3) ... ok
+test_1040_s3 (tests.ty2022.test_f1040_s3.Form1040S3TestCaseTooManyForeignTaxesSingle.test_1040_s3) ... ok
+test_simple_w2 (tests.ty2022.test_fw_2.FormW2TestCase.test_simple_w2) ... ok
+
+----------------------------------------------------------------------
+Ran 53 tests in 0.217s
+
+OK

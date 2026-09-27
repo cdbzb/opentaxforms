@@ -1,0 +1,331 @@
+{
+  "runtime": "v24.3.0",
+  "bundles": {
+    "opentax": {
+      "revision": "9c6db5b2db4178c4c39a37957bf1de9e2ceb0d20",
+      "bytes": 150221,
+      "inputFiles": 35,
+      "externalImports": []
+    },
+    "telostax": {
+      "revision": "989fa6e6b7e4f712676dc17072267a8a7ad93978",
+      "bytes": 537624,
+      "inputFiles": 91,
+      "externalImports": []
+    },
+    "invaro": {
+      "revision": "aed43ba789dd295b1f315c728cb7f2cadd98f4d8",
+      "bytes": 2101435,
+      "inputFiles": 95,
+      "externalImports": []
+    },
+    "direct-file": {
+      "revision": "e365f9f43446010af36cccf7edecc52953c00fe9",
+      "bytes": 6478654,
+      "inputFiles": 2,
+      "externalImports": []
+    },
+    "filed": {
+      "revision": "6a25dba8a836f6564e5561acb15a85f96fec7798",
+      "bytes": 311450,
+      "inputFiles": 33,
+      "externalImports": []
+    }
+  },
+  "checks": [
+    {
+      "name": "OpenTax gain to 1040",
+      "actual": 2000,
+      "expected": 2000,
+      "passed": true
+    },
+    {
+      "name": "TelosTax gain to 1040",
+      "actual": 2000,
+      "expected": 2000,
+      "passed": true
+    },
+    {
+      "name": "OpenTax zero to 1040",
+      "actual": 0,
+      "expected": 0,
+      "passed": true
+    },
+    {
+      "name": "TelosTax zero to 1040",
+      "actual": 0,
+      "expected": 0,
+      "passed": true
+    },
+    {
+      "name": "OpenTax small loss to 1040",
+      "actual": -1000,
+      "expected": -1000,
+      "passed": true
+    },
+    {
+      "name": "TelosTax small loss to 1040",
+      "actual": -1000,
+      "expected": -1000,
+      "passed": true
+    },
+    {
+      "name": "OpenTax loss at limit to 1040",
+      "actual": -3000,
+      "expected": -3000,
+      "passed": true
+    },
+    {
+      "name": "TelosTax loss at limit to 1040",
+      "actual": -3000,
+      "expected": -3000,
+      "passed": true
+    },
+    {
+      "name": "OpenTax loss above limit to 1040",
+      "actual": -3000,
+      "expected": -3000,
+      "passed": true
+    },
+    {
+      "name": "TelosTax loss above limit to 1040",
+      "actual": -3000,
+      "expected": -3000,
+      "passed": true
+    },
+    {
+      "name": "OpenTax MFS loss limit",
+      "actual": -1500,
+      "expected": -1500,
+      "passed": true
+    },
+    {
+      "name": "TelosTax MFS loss limit",
+      "actual": -1500,
+      "expected": -1500,
+      "passed": true
+    },
+    {
+      "name": "OpenTax IRS published example deduction",
+      "actual": -3000,
+      "expected": -3000,
+      "passed": true
+    },
+    {
+      "name": "OpenTax IRS published example carryforward",
+      "actual": 4000,
+      "expected": 4000,
+      "passed": true
+    },
+    {
+      "name": "TelosTax IRS published example deduction",
+      "actual": 3000,
+      "expected": 3000,
+      "passed": true
+    },
+    {
+      "name": "TelosTax IRS published example carryforward",
+      "actual": 4000,
+      "expected": 4000,
+      "passed": true
+    },
+    {
+      "name": "OpenTax standalone carryover deduction",
+      "actual": -3000,
+      "expected": -3000,
+      "passed": true
+    },
+    {
+      "name": "OpenTax carryover-only full return",
+      "actual": 0,
+      "expected": -3000,
+      "passed": false
+    },
+    {
+      "name": "TelosTax standalone carryover deduction",
+      "actual": 3000,
+      "expected": 3000,
+      "passed": true
+    },
+    {
+      "name": "TelosTax carryover-only full return",
+      "actual": 0,
+      "expected": -3000,
+      "passed": false
+    },
+    {
+      "name": "OpenTax box B excluded from Schedule D line 1b",
+      "actual": 2000,
+      "expected": 0,
+      "passed": false
+    },
+    {
+      "name": "OpenTax low-income carryforward",
+      "actual": 2000,
+      "expected": 5000,
+      "passed": false
+    },
+    {
+      "name": "TelosTax low-income carryforward",
+      "actual": 2000,
+      "expected": 5000,
+      "passed": false
+    },
+    {
+      "name": "Invaro capital loss deduction",
+      "actual": "300000",
+      "expected": "300000",
+      "passed": true
+    },
+    {
+      "name": "Invaro proof verifies",
+      "actual": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "name": "Fact Graph missing inputs remain incomplete",
+      "actual": false,
+      "expected": false,
+      "passed": true
+    },
+    {
+      "name": "Fact Graph sum",
+      "actual": "150.00",
+      "expected": "150.00",
+      "passed": true
+    },
+    {
+      "name": "Fact Graph propagates update",
+      "actual": "225.00",
+      "expected": "225.00",
+      "passed": true
+    },
+    {
+      "name": "Filed carryover-only deduction routes to 1040",
+      "actual": -3000,
+      "expected": -3000,
+      "passed": true
+    }
+  ],
+  "observations": {
+    "opentaxBoxB": {
+      "line1b": 2000,
+      "line2": null,
+      "carryoverInputs": {
+        "kind": "computed",
+        "nodeId": "scheduleD.line6",
+        "inputs": []
+      },
+      "gainTransferSource": {
+        "kind": "computed",
+        "nodeId": "form1040.line7",
+        "inputs": [
+          "scheduleD.line21"
+        ]
+      }
+    },
+    "telostaxTrace": {
+      "lines": [
+        "form1040.line9",
+        "form1040.line11",
+        "form1040.line13",
+        "form1040.line15",
+        "form1040.line16",
+        "form1040.totalTaxBeforeCredits",
+        "form1040.line24",
+        "form1040.line37"
+      ],
+      "totalIncome": {
+        "lineId": "form1040.line9",
+        "label": "Total Income",
+        "value": -3000,
+        "formula": "sum of all income sources",
+        "authority": "Form 1040, Line 9; IRC §61",
+        "inputs": []
+      }
+    },
+    "invaro": {
+      "verification": {
+        "ok": true,
+        "target": "us.federal.capital_loss_ordinary_offset",
+        "value": "300000",
+        "corpusMerkleRoot": "sha256:5f34e0bc2fe5d80f540b75151cc8793bca4bda4555485dfb0d313927938f1911"
+      },
+      "assumptions": [
+        {
+          "factId": "shortTermCapitalGains",
+          "value": {
+            "type": "money",
+            "value": "0"
+          },
+          "source": "default",
+          "rationale": "Assumed no net short-term capital gain absent contrary input"
+        },
+        {
+          "factId": "longTermCapitalGains",
+          "value": {
+            "type": "money",
+            "value": "0"
+          },
+          "source": "default",
+          "rationale": "Assumed no capital gains or qualified dividends absent contrary input"
+        },
+        {
+          "factId": "shortTermCapitalLoss",
+          "value": {
+            "type": "money",
+            "value": "0"
+          },
+          "source": "default",
+          "rationale": "Assumed no net short-term capital loss absent contrary input"
+        },
+        {
+          "factId": "longTermCapitalLoss",
+          "value": {
+            "type": "money",
+            "value": "0"
+          },
+          "source": "default",
+          "rationale": "Assumed no net long-term capital loss absent contrary input"
+        }
+      ]
+    },
+    "factGraphMissing": [
+      [
+        "/a",
+        "/b"
+      ]
+    ],
+    "filedCarryover": {
+      "outputs": [
+        {
+          "nodeType": "f1040",
+          "fields": {
+            "line7_capital_gain": -3000
+          }
+        },
+        {
+          "nodeType": "agi_aggregator",
+          "fields": {
+            "line7_capital_gain": -3000
+          }
+        },
+        {
+          "nodeType": "schedule_d",
+          "fields": {
+            "print_line7_st_total": -5000,
+            "print_line15_lt_total": 0,
+            "print_line16_combined": -5000,
+            "print_qof_disposition": false,
+            "print_line21_loss": -3000
+          }
+        }
+      ]
+    }
+  },
+  "summary": {
+    "passed": 24,
+    "failed": 5
+  }
+}

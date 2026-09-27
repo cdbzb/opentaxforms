@@ -1,0 +1,61 @@
+{
+  "inspectedOn": "2026-09-26",
+  "repositories": [
+    {
+      "name": "opentax",
+      "repository": "https://github.com/xavierliwei/opentax",
+      "revision": "9c6db5b2db4178c4c39a37957bf1de9e2ceb0d20",
+      "commitDate": "2026-04-07T01:04:10-07:00",
+      "commitSubject": "chore: remove auto-restore hook and clean up recovery files",
+      "licenseSHA256": "6e8048ba7f70adb8c4f89c4899a8671e019eac44671022d61361282a7055f668"
+    },
+    {
+      "name": "ustaxes",
+      "repository": "https://github.com/ustaxes/UsTaxes",
+      "revision": "cc2b8c06b26be57596dc9d112dadd919f2f4a86d",
+      "commitDate": "2026-09-23T09:20:38Z",
+      "commitSubject": "build(deps): bump tauri from 2.11.5 to 2.11.6 in /src-tauri (#2599)",
+      "licenseSHA256": "20b067f86de375aae6db0f283ab2e65de24d537733b89bd58432c101259d84cf"
+    },
+    {
+      "name": "telostax",
+      "repository": "https://github.com/telosnews/TelosTax",
+      "revision": "989fa6e6b7e4f712676dc17072267a8a7ad93978",
+      "commitDate": "2026-04-13T13:06:32-04:00",
+      "commitSubject": "Fix Form 1040 PDF field mapping, multi-form import, and UX improvements",
+      "licenseSHA256": "336608f103bfbd326f8f29df4c0c0d076e066bcf1ada71fff899c78429319969"
+    },
+    {
+      "name": "habutax",
+      "repository": "https://github.com/habutax/habutax",
+      "revision": "0d4f8d13b246b0dd0a51c9f0efd62eb8b8b4f9ef",
+      "commitDate": "2024-02-24T10:16:49-05:00",
+      "commitSubject": "HabuTax version 0.2.1",
+      "licenseSHA256": "8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643"
+    },
+    {
+      "name": "direct-file",
+      "repository": "https://github.com/IRS-Public/direct-file",
+      "revision": "e365f9f43446010af36cccf7edecc52953c00fe9",
+      "commitDate": "2026-06-11T15:58:44-04:00",
+      "commitSubject": "Update README.md",
+      "licenseSHA256": "8a2c197266fcf7dbf4af0138ecea6cdf97f7b430e0428523d8f41fbf1b29bc1b"
+    },
+    {
+      "name": "filed",
+      "repository": "https://github.com/filedcom/opentax",
+      "revision": "6a25dba8a836f6564e5561acb15a85f96fec7798",
+      "commitDate": "2026-09-26T18:01:32+02:00",
+      "commitSubject": "fix(f1040): limit investment interest and NIIT deductions (#50)",
+      "licenseSHA256": "8486a10c4393cee1c25392769ddd3b2d6c242d6ec7928e1414efff7dfb2f07ef"
+    },
+    {
+      "name": "invaro",
+      "repository": "https://github.com/Invaro/opentax-engine",
+      "revision": "aed43ba789dd295b1f315c728cb7f2cadd98f4d8",
+      "commitDate": "2026-09-09T14:57:26-07:00",
+      "commitSubject": "Docs: federal scope in three buckets (Schedule H is a target, Form 5695 not covered)",
+      "licenseSHA256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0"
+    }
+  ]
+}

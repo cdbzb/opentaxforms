@@ -1,0 +1,209 @@
+--- a/src/engine/scheduleD.ts
++++ b/src/engine/scheduleD.ts
+@@ -1,6 +1,7 @@
+ import { FilingStatus, Income1099B, ScheduleDResult } from '../types/index.js';
+ import { SCHEDULE_D } from '../constants/tax2025.js';
+ import { round2 } from './utils.js';
++import type { TraceBuilder } from './traceBuilder.js';
+ 
+ /**
+  * Calculate Schedule D — Capital Gains and Losses.
+@@ -18,6 +19,9 @@
+  *
+  * When computing the new carryforward, short-term net losses absorb the deduction
+  * first, then long-term net losses. This preserves character for future years.
++ * OpenTaxForms: standalone carryforward amounts below are provisional, assuming
++ * the full deduction can be absorbed. The full Form 1040 entry point finalizes
++ * them using unfloored taxable income. Do not expose standalone amounts as final.
+  *
+  * @authority
+  *   IRC: Section 1(h) — maximum capital gains rate
+@@ -35,11 +39,13 @@
+   carryforwardST?: number,
+   carryforwardLT?: number,
+   capitalGainDistributions?: number,
++  tb?: TraceBuilder,
+ ): ScheduleDResult {
+   let shortTermGain = 0;
+   let shortTermLoss = 0;
+   let longTermGain = 0;
+   let longTermLoss = 0;
++  const saleValues = new Map<string, number>();
+ 
+   for (const t of transactions) {
+     // Wash sale adjustment (Box 1g): disallowed loss reduces the deductible loss.
+@@ -58,6 +64,15 @@
+       ? round2(costBasis - washSaleAdj)
+       : round2(costBasis);
+     const gainOrLoss = round2(proceeds - adjustedBasis);
++    saleValues.set(t.id, gainOrLoss);
++    tb?.trace(`sale.${t.id}.gain`, t.description || 'Stock sale', gainOrLoss, {
++      formula: washSaleAdj > 0 ? 'proceeds − basis + wash sale adjustment' : 'proceeds − basis', authority: 'Schedule D, column (h)',
++      inputs: [
++        { lineId: `sale.${t.id}.proceeds`, label: 'Proceeds', value: proceeds },
++        { lineId: `sale.${t.id}.basis`, label: 'Cost basis', value: costBasis },
++        ...(washSaleAdj > 0 ? [{ lineId: `sale.${t.id}.adjustment`, label: 'Wash sale adjustment', value: washSaleAdj }] : []),
++      ],
++    });
+ 
+     if (t.isLongTerm) {
+       if (gainOrLoss >= 0) {
+@@ -139,6 +154,39 @@
+     }
+   }
+ 
++  // OpenTaxForms: execution-attached provenance; the adapter maps eligible
++  // covered/no-adjustment sales to actual Schedule D lines 1a and 8a.
++  for (const long of [false, true]) {
++    const term = long ? 'long' : 'short';
++    const carryLine = long ? '14' : '6';
++    const netLine = long ? '15' : '7';
++    const sales = transactions.filter(t => t.isLongTerm === long);
++    const subtotal = round2(long ? longTermGain - capGainDist - (longTermLoss - cfLT) : shortTermGain - (shortTermLoss - cfST));
++    tb?.trace(`capitalSales.${term}`, `${long ? 'Long' : 'Short'}-term sales`, subtotal, {
++      formula: 'Sum of the sale gains and losses', authority: 'Schedule D, Parts I and II',
++      inputs: sales.map(t => ({ lineId: `sale.${t.id}.gain`, label: t.description, value: saleValues.get(t.id)! })),
++    });
++    tb?.trace(`scheduleD.line${carryLine}`, `${term}-term carryover applied`, -(long ? cfLT : cfST), {
++      formula: 'Apply the carryover as a loss', authority: `Schedule D, line ${carryLine}`,
++      inputs: [{ lineId: `prior.${long ? 13 : 8}`, label: 'Prior-year carryover worksheet', value: long ? cfLT : cfST }],
++    });
++    tb?.trace(`scheduleD.line${netLine}`, `Net ${term}-term gain or loss`, long ? netLongTerm : netShortTerm, {
++      formula: long && capGainDist > 0 ? 'Sales result + carryover loss + capital gain distributions' : 'Sales result + carryover loss', authority: `Schedule D, line ${netLine}`,
++      inputs: [
++        { lineId: `capitalSales.${term}`, label: 'Sales subtotal', value: subtotal },
++        { lineId: `scheduleD.line${carryLine}`, label: 'Carryover applied', value: -(long ? cfLT : cfST) },
++        ...(long && capGainDist > 0 ? [{ lineId: 'scheduleD.line13', label: 'Capital gain distributions', value: capGainDist }] : []),
++      ],
++    });
++  }
++  tb?.trace('scheduleD.line16', 'Combined net gain or loss', netGainOrLoss, {
++    formula: 'line 7 + line 15', authority: 'Schedule D, line 16',
++    inputs: [{ lineId: 'scheduleD.line7', label: 'Net short-term', value: netShortTerm }, { lineId: 'scheduleD.line15', label: 'Net long-term', value: netLongTerm }],
++  });
++  if (netGainOrLoss < 0) tb?.trace('scheduleD.line21', 'Limited capital loss', -capitalLossDeduction, {
++    formula: `Limit the loss to $${lossLimit.toLocaleString('en-US')}`, authority: 'Schedule D, line 21',
++    inputs: [{ lineId: 'scheduleD.line16', label: 'Combined loss', value: netGainOrLoss }, { lineId: 'filingStatus', label: 'Filing status determines the limit', value: filingStatus }],
++  });
+   return {
+     shortTermGain: round2(shortTermGain),
+     shortTermLoss: round2(shortTermLoss),
+--- a/src/engine/form1040Sections.ts
++++ b/src/engine/form1040Sections.ts
+@@ -48,6 +48,7 @@
+ import { calculateNIIT } from './niit.js';
+ import { calculateAdditionalMedicareTaxW2 } from './additionalMedicare.js';
+ import { calculateScheduleD } from './scheduleD.js';
++import { calculateCapitalLossCarryover } from './capitalLossCarryover.js';
+ import { calculateTaxableSocialSecurity } from './socialSecurity.js';
+ import { calculateScheduleE } from './scheduleE.js';
+ import { calculateDependentCareCredit } from './dependentCare.js';
+@@ -977,7 +978,9 @@
+   // Schedule D
+   const has1099B = allScheduleDTransactions.length > 0;
+   const hasCapGainDist = ctx.totalCapitalGainDistributions > 0;
+-  ctx.scheduleD = (has1099B || ctx.homeSaleTaxableGain > 0 || hasCapGainDist)
++  const hasCarryover = (taxReturn.capitalLossCarryforward || 0) > 0 ||
++    (taxReturn.capitalLossCarryforwardST || 0) > 0 || (taxReturn.capitalLossCarryforwardLT || 0) > 0;
++  ctx.scheduleD = (has1099B || ctx.homeSaleTaxableGain > 0 || hasCapGainDist || hasCarryover)
+     ? calculateScheduleD(
+         allScheduleDTransactions,
+         safeNum(taxReturn.capitalLossCarryforward),
+@@ -985,6 +988,7 @@
+         taxReturn.capitalLossCarryforwardST,
+         taxReturn.capitalLossCarryforwardLT,
+         ctx.totalCapitalGainDistributions,
++        ctx.tb,
+       )
+     : undefined;
+ 
+@@ -1264,7 +1268,7 @@
+       ...(ctx.scheduleFNetProfit !== 0 ? [{ lineId: 'scheduleF.line34', label: 'Schedule F Net Farm Profit', value: round2(ctx.scheduleFNetProfit) }] : []),
+       ...(ctx.totalRetirementIncome > 0 ? [{ lineId: 'form1040.line5b', label: 'Taxable Retirement Distributions', value: round2(ctx.totalRetirementIncome) }] : []),
+       ...(ctx.taxableSocialSecurity > 0 ? [{ lineId: 'form1040.line6b', label: 'Taxable Social Security', value: round2(ctx.taxableSocialSecurity) }] : []),
+-      ...(ctx.scheduleDNetGain > 0 ? [{ lineId: 'scheduleD', label: 'Capital Gains', value: round2(ctx.scheduleDNetGain) }] : []),
++      ...(ctx.scheduleD ? [{ lineId: 'form1040.line7a', label: 'Capital gain or loss', value: round2(ctx.scheduleDNetGain - ctx.capitalLossDeduction) }] : []),
+       ...(ctx.scheduleEIncome !== 0 ? [{ lineId: 'scheduleE', label: 'Rental/Partnership Income', value: round2(ctx.scheduleEIncome) }] : []),
+       ...(ctx.totalUnemployment > 0 ? [{ lineId: 'form1040.1099g', label: 'Unemployment Compensation', value: round2(ctx.totalUnemployment) }] : []),
+       ...(ctx.k1OrdinaryIncome > 0 ? [{ lineId: 'k1.ordinary', label: 'K-1 Ordinary Income', value: round2(ctx.k1OrdinaryIncome) }] : []),
+@@ -1575,6 +1579,23 @@
+   }
+ 
+   ctx.taxableIncome = round2(Math.max(0, taxableBeforeNOL - ctx.nolDeduction - ctx.qbiDeduction - ctx.schedule1ADeduction));
++
++  // OpenTaxForms correction: preserve negative taxable income for carryover.
++  // Pub.550 (2025), p.102: loss consumed is limited by taxable income + deduction.
++  if (ctx.scheduleD) {
++    const taxableIncomeUnfloored = round2(ctx.agi - ctx.deductionAmount - ctx.nolDeduction - ctx.qbiDeduction - ctx.schedule1ADeduction);
++    const carryover = calculateCapitalLossCarryover({
++      taxableIncomeUnfloored, shortTerm: ctx.scheduleD.netShortTerm,
++      longTerm: ctx.scheduleD.netLongTerm, lossDeduction: ctx.scheduleD.capitalLossDeduction,
++    }, ctx.tb, 'next');
++    ctx.scheduleD.capitalLossCarryforward = carryover.total;
++    ctx.scheduleD.capitalLossCarryforwardST = carryover.shortTerm;
++    ctx.scheduleD.capitalLossCarryforwardLT = carryover.longTerm;
++    ctx.tb.trace('next.input.taxable', 'Taxable income before the zero floor', taxableIncomeUnfloored, {
++      formula: 'AGI − deductions (allow a negative result)', authority: 'Publication 550 (2025), p.102',
++      inputs: [{ lineId: 'form1040.line11', label: 'AGI', value: ctx.agi }, { lineId: 'form1040.line13', label: 'Deduction', value: ctx.deductionAmount }],
++    });
++  }
+ 
+   // Trace: Deductions & Taxable Income
+   ctx.tb.trace('form1040.line13', 'Deductions', ctx.deductionAmount, {
+@@ -2367,6 +2388,11 @@
+   const { taxReturn } = ctx;
+   const ssaBenefits = taxReturn.incomeSSA1099?.totalBenefits || 0;
+   const capitalGainOrLoss = round2(ctx.scheduleDNetGain - ctx.capitalLossDeduction);
++  ctx.tb.trace('form1040.line7a', 'Capital gain or loss', capitalGainOrLoss, {
++    formula: ctx.scheduleD && ctx.scheduleD.netGainOrLoss < 0 ? 'Transfer the limited loss from Schedule D line 21' : 'Transfer Schedule D line 16',
++    authority: '2025 Form 1040, line 7a; Schedule D, Part III',
++    inputs: ctx.scheduleD ? [{ lineId: ctx.scheduleD.netGainOrLoss < 0 ? 'scheduleD.line21' : 'scheduleD.line16', label: 'Schedule D', value: capitalGainOrLoss }] : [],
++  });
+ 
+   const form1040: Form1040Result = {
+     totalWages: round2(ctx.totalWages),
+--- /dev/null
++++ b/src/engine/capitalLossCarryover.ts
+@@ -0,0 +1,42 @@
++// OpenTaxForms addition: fills the verified gap in upstream carryforward logic.
++// IRS 2025 Schedule D instructions, Capital Loss Carryover Worksheet, p.10:
++// https://www.irs.gov/pub/irs-prior/i1040sd--2025.pdf#page=10
++// Outgoing loss rule: Pub.550 (2025), p.102 (not an official 2026 worksheet).
++// https://www.irs.gov/pub/irs-prior/p550--2025.pdf#page=102
++import { round2 } from './utils.js';
++import type { TraceBuilder } from './traceBuilder.js';
++
++export interface CarryoverInput {
++  taxableIncomeUnfloored: number;
++  shortTerm: number;
++  longTerm: number;
++  lossDeduction: number; // Schedule D line 21 as a positive number
++}
++export function calculateCapitalLossCarryover(input: CarryoverInput, tb?: TraceBuilder, prefix = 'carryover') {
++  if (Object.values(input).some(n => !Number.isFinite(n)) || input.lossDeduction < 0) {
++    throw new Error('Carryover requires finite amounts and a nonnegative loss deduction.');
++  }
++  const lines: Record<number, number> = {};
++  const put = (line: number, label: string, value: number, formula: string, deps: string[]) => {
++    lines[line] = round2(value);
++    tb?.trace(`${prefix}.${line}`, label, lines[line], {
++      formula, authority: 'Capital Loss Carryover Worksheet; 2025 Schedule D instructions, p.10',
++      inputs: deps.map(id => ({ lineId: id, label: id, value: id.startsWith(`${prefix}.`) && /^\d+$/.test(id.split('.').at(-1)!) ? lines[Number(id.split('.').at(-1))] :
++        id.endsWith('taxable') ? input.taxableIncomeUnfloored : id.endsWith('deduction') ? input.lossDeduction : id.endsWith('short') ? input.shortTerm : input.longTerm })),
++    });
++  };
++  put(1, 'Taxable income, allowing a negative amount', input.taxableIncomeUnfloored, 'Taxable income before the zero floor', [`${prefix}.input.taxable`]);
++  put(2, 'Capital loss deduction', input.lossDeduction, 'Loss on Schedule D line 21, as a positive amount', [`${prefix}.input.deduction`]);
++  put(3, 'Income available to absorb the loss', Math.max(0, lines[1] + lines[2]), 'max(0, line 1 + line 2)', [`${prefix}.1`, `${prefix}.2`]);
++  put(4, 'Loss used against income', Math.min(lines[2], lines[3]), 'min(line 2, line 3)', [`${prefix}.2`, `${prefix}.3`]);
++  put(5, 'Short-term loss', Math.max(0, -input.shortTerm), 'Short-term loss as a positive amount, otherwise 0', [`${prefix}.input.short`]);
++  put(6, 'Long-term gain', Math.max(0, input.longTerm), 'Long-term gain, otherwise 0', [`${prefix}.input.long`]);
++  put(7, 'Short-term loss absorbed', lines[4] + lines[6], 'line 4 + line 6', [`${prefix}.4`, `${prefix}.6`]);
++  put(8, 'Short-term loss carryover', Math.max(0, lines[5] - lines[7]), 'max(0, line 5 − line 7)', [`${prefix}.5`, `${prefix}.7`]);
++  put(9, 'Long-term loss', Math.max(0, -input.longTerm), 'Long-term loss as a positive amount, otherwise 0', [`${prefix}.input.long`]);
++  put(10, 'Short-term gain', Math.max(0, input.shortTerm), 'Short-term gain, otherwise 0', [`${prefix}.input.short`]);
++  put(11, 'Remaining deduction applied to long-term loss', Math.max(0, lines[4] - lines[5]), 'max(0, line 4 − line 5)', [`${prefix}.4`, `${prefix}.5`]);
++  put(12, 'Long-term loss absorbed', lines[10] + lines[11], 'line 10 + line 11', [`${prefix}.10`, `${prefix}.11`]);
++  put(13, 'Long-term loss carryover', Math.max(0, lines[9] - lines[12]), 'max(0, line 9 − line 12)', [`${prefix}.9`, `${prefix}.12`]);
++  return { lines, shortTerm: lines[8], longTerm: lines[13], total: round2(lines[8] + lines[13]) };
++}
