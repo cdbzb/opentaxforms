@@ -4,6 +4,7 @@ import { TraceBuilder } from '../../vendor/telostax/src/engine/traceBuilder';
 import { FilingStatus, type TaxReturn, type CalculationTrace } from '../../vendor/telostax/src/types';
 import { fieldMoney, InputError, priorLabels, validateShape, type Draft } from './model';
 import { unsupportedField } from '../forms/form1040';
+import { addIncomeTax } from '../tax/2025/incomeTax';
 
 export interface ValueNode { id: string; value: number; inputs: string[]; explanation: string; entered?: boolean }
 export interface Calculation { nodes: Map<string, ValueNode>; errors: string[]; errorSource?: string }
@@ -31,6 +32,33 @@ export function calculate(draft: Draft): Calculation {
         }) };
     }
     const wages = fieldMoney(draft.wages, 'form1040.line1a', 'W-2 wages · line 1a');
+    const investments = draft.investments;
+    if (investments.special) throw new InputError('Return incomplete: special investment treatment is not supported yet. Review bond/OID adjustments, nominee income, savings-bond exclusions, foreign tax, nondividend distributions, section 199A dividends, collectibles/section 1250 gains and investment-interest elections.', 'scheduleB.special');
+    const hasInvestments = investments.interest.length + investments.dividends.length > 0;
+    for (const key of ['foreignAccount','foreignTrust'] as const) {
+      if (investments[key] === 'yes') throw new InputError('Return incomplete: foreign accounts or trusts require reporting that is not supported yet. See Schedule B Part III and its instructions.', `scheduleB.${key}`);
+      if (hasInvestments && investments[key] === 'unanswered') throw new InputError(`Complete Schedule B Part III: answer the ${key === 'foreignAccount' ? 'foreign account' : 'foreign trust'} question.`, `scheduleB.${key}`);
+    }
+    const payerAmount = (kind: string, payer: {id:string;payer:string}, key: string, raw: string) => {
+      const id = `${kind}.${payer.id}.${key}`;
+      const value = fieldMoney(raw,id,`${payer.payer || 'Payer'} · ${key}`);
+      set(id,value,[],`${payer.payer}: ${key} amount entered from your records`,true);
+      return value;
+    };
+    const requirePayer = (kind: string, payer: {id:string;payer:string}) => {
+      if (!payer.payer.trim()) throw new InputError('Enter the payer name for this Schedule B entry.',`${kind}.${payer.id}.payer`);
+    };
+    const interest = investments.interest.map(p => {
+      requirePayer('interest',p);
+      return {id:p.id,payerName:p.payer,amount:payerAmount('interest',p,'taxable',p.taxable),taxExemptInterest:payerAmount('interest',p,'exempt',p.exempt)};
+    });
+    const dividends = investments.dividends.map(p => {
+      requirePayer('dividends',p);
+      const ordinaryDividends=payerAmount('dividends',p,'ordinary',p.ordinary);
+      const qualifiedDividends=payerAmount('dividends',p,'qualified',p.qualified);
+      if (qualifiedDividends > ordinaryDividends) throw new InputError('Qualified dividends cannot exceed ordinary dividends for the same payer. Qualified dividends are already included in box 1a.',`dividends.${p.id}.qualified`);
+      return {id:p.id,payerName:p.payer,ordinaryDividends,qualifiedDividends,capitalGainDistributions:payerAmount('dividends',p,'capitalGain',p.capitalGain)};
+    });
     const status = { single: FilingStatus.Single, mfj: FilingStatus.MarriedFilingJointly, mfs: FilingStatus.MarriedFilingSeparately, hoh: FilingStatus.HeadOfHousehold, qss: FilingStatus.QualifyingSurvivingSpouse }[draft.filingStatus];
     set('filingStatus', status, [], 'Filing status is user-selected; eligibility is not determined by this prototype.', true);
     set('form1040.line1a', wages, [], 'Total wages from W-2 box 1', true);
@@ -65,11 +93,22 @@ export function calculate(draft: Draft): Calculation {
     const taxReturn: TaxReturn = {
       id: 'local', schemaVersion: 1, taxYear: 2025, status: 'in_progress', currentStep: 0, currentSection: 'review',
       filingStatus: status, dependents: [], w2Income: [{ id: 'wages', employerName: '', wages, federalTaxWithheld: 0, socialSecurityWages: wages, socialSecurityTax: 0, medicareWages: wages, medicareTax: 0, stateTaxWithheld: 0 }],
-      income1099NEC: [], income1099K: [], income1099INT: [], income1099DIV: [], income1099R: [], income1099G: [], income1099MISC: [], income1099B: sales,
+      income1099NEC: [], income1099K: [], income1099INT: interest, income1099DIV: dividends, income1099R: [], income1099G: [], income1099MISC: [], income1099B: sales,
       incomeK1: [], income1099SA: [], incomeW2G: [], income1099DA: [], income1099C: [], income1099Q: [], businesses: [], rentalProperties: [], otherIncome: 0, expenses: [], educationCredits: [],
       deductionMethod: 'standard', incomeDiscovery: {}, createdAt: '', updatedAt: '', capitalLossCarryforwardST: st, capitalLossCarryforwardLT: lt,
     };
     const result = calculateForm1040(taxReturn, { enabled: true });
+    // Reuse engine aggregation; attach the payer inputs rather than reconstructing
+    // income arithmetic in the UI. Special exclusions/adjustments are gated above.
+    set('scheduleB.line2', result.form1040.totalInterest, interest.map(p=>`interest.${p.id}.taxable`), 'Sum of taxable interest from the listed payers.');
+    set('scheduleB.line3', 0, [], 'No savings-bond exclusion claimed. Form 8815 is unsupported; mark special investment treatment if it applies.');
+    set('scheduleB.line4', result.form1040.totalInterest, ['scheduleB.line2','scheduleB.line3'], 'Line 2 less line 3.');
+    set('scheduleB.line6', result.form1040.totalDividends, dividends.map(p=>`dividends.${p.id}.ordinary`), 'Sum of ordinary dividends, including the qualified portion.');
+    set('form1040.line2a', result.form1040.taxExemptInterest, interest.map(p=>`interest.${p.id}.exempt`), 'Tax-exempt interest; excluded from total income.');
+    set('form1040.line2b', result.form1040.totalInterest, ['scheduleB.line4'], 'Taxable interest from Schedule B line 4.');
+    set('form1040.line3a', result.form1040.qualifiedDividends, dividends.map(p=>`dividends.${p.id}.qualified`), 'Eligible qualified portion of the ordinary dividends; do not add to income again.');
+    set('form1040.line3b', result.form1040.totalDividends, ['scheduleB.line6'], 'Ordinary dividends from Schedule B line 6.');
+    set('scheduleD.line13', result.form1040.totalCapitalGainDistributions, dividends.map(p=>`dividends.${p.id}.capitalGain`), 'Sum of ordinary capital gain distributions from Form 1099-DIV box 2a.');
     traces.push(...result.traces || []);
     // Upstream ID line13 describes the deduction amount; map to actual 2025
     // line12e for this standard-deduction-only slice. The API's line11 is 11a/11b.
@@ -95,6 +134,7 @@ export function calculate(draft: Draft): Calculation {
     } else {
       for (const id of ['capitalSales.short','capitalSales.long','scheduleD.line6','scheduleD.line7','scheduleD.line14','scheduleD.line15','scheduleD.line16']) set(id,0,[],'No sales or prior-year losses entered.');
     }
+    addIncomeTax(nodes,status);
     validateGraph(nodes);
     return { nodes, errors: [] };
   } catch (error) {

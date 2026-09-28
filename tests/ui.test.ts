@@ -31,18 +31,20 @@ describe('forms interaction',()=>{
     const expected='1a 1b 1c 1d 1e 1f 1g 1h 1i 1z 2a 2b 3a 3b 3c 4a 4b 4c 5a 5b 5c 6a 6b 6c 6d 7a 7b 8 9 10 11a 11b 12a 12b 12c 12d 12e 13a 13b 14 15 16 17 18 19 20 21 22 23 24 25a 25b 25c 25d 26 27a 27b 27c 28 29 30 31 32 33 34 35a 35b 35c 35d 36 37 38'.split(' ');
     const actual=[...root.querySelectorAll('article [data-line]')].map(el=>el.getAttribute('data-line')!.replace('form1040.line','')).filter(line=>/^\d/.test(line));
     expect(actual).toEqual(expected);
-    for(const line of ['16','24','33','35a','37']){
+    for(const line of ['24','33','35a','37']){
       const row=root.querySelector(`[data-line="form1040.line${line}"]`)!;
       expect(row.textContent).toContain('Not calculated');expect(row.textContent).not.toContain('$0.00');
     }
     const interest=root.querySelector('[data-line="form1040.line2b"]')!;
-    expect(interest.textContent).toContain('Unsupported');
-    click('[data-line="form1040.line2b"] .support-marker');
+    expect(interest.textContent).toContain('Schedule B');
+    expect(root.querySelector('[data-line="form1040.line16"]')!.textContent).toContain('$4,115.00');
+    click('[data-line="form1040.line2b"] .line-label-button');
     expect(root.querySelector('.inspector')!.textContent).toContain('Schedule B');
     expect(root.querySelector('.inspector a')!.getAttribute('href')).toContain('irs.gov');
   });
-  it('saves unsupported interest, marks every form incomplete, and restores supported results after clearing',async()=>{
-    app=mountApp(root);click('[data-action="example"]');edit('unsupported:2b:amount','125');
+  it('preserves legacy unverified interest, marks every form incomplete, and restores results after review',async()=>{
+    const legacy=exampleDraft();legacy.unsupported1040['2b']={applies:false,amount:'125'};
+    localStorage.setItem(STORAGE_KEY,encode(legacy));app=mountApp(root);
     expect(root.querySelector('.incomplete-notice')!.textContent).toContain('Return incomplete');
     expect(root.querySelector('[data-line="form1040.line9"]')!.textContent).toContain('—');
     const exported=encode(app.getDraft());
@@ -75,11 +77,11 @@ describe('forms interaction',()=>{
     const wage=root.querySelector<HTMLInputElement>('[data-key="wages"]')!;
     wage.focus();expect(document.activeElement).toBe(wage);
     expect(root.querySelector('.inspector h3')!.textContent).toContain('Wages');
-    const interest=root.querySelector<HTMLInputElement>('[data-key="unsupported:2b:amount"]')!;
-    interest.focus();expect(document.activeElement).toBe(interest);
-    expect(root.querySelector('.inspector')!.textContent).toContain('Schedule B');
-    expect(root.querySelector('.inspector [data-key="unsupported:2b:applies"]')).not.toBeNull();
-    expect(root.querySelector('[data-line="form1040.line2b"]')!.classList.contains('selected')).toBe(true);
+    const pension=root.querySelector<HTMLInputElement>('[data-key="unsupported:5b:amount"]')!;
+    pension.focus();expect(document.activeElement).toBe(pension);
+    expect(root.querySelector('.inspector')!.textContent).toContain('Pension');
+    expect(root.querySelector('.inspector [data-key="unsupported:5b:applies"]')).not.toBeNull();
+    expect(root.querySelector('[data-line="form1040.line5b"]')!.classList.contains('selected')).toBe(true);
   });
   it('attaches a compact amount error to the paper field with the full accessible message',()=>{
     app=mountApp(root);click('[data-action="example"]');edit('wages','');
@@ -199,5 +201,40 @@ describe('forms interaction',()=>{
     expect(exported?.type).toBe('application/json');expect(exported!.size).toBeGreaterThan(100);
     click('[data-action="print"]');expect(print).toHaveBeenCalledOnce();expect(fetch).not.toHaveBeenCalled();
     vi.runAllTimers();expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:test');vi.useRealTimers();
+  });
+  it('enters payer data, follows the tax worksheet to its source, and reloads locally',()=>{
+    app=mountApp(root);click('[data-action="example"]');click('[data-page="scheduleB"]');
+    click('[data-action="add-dividend"]');
+    const id=app.getDraft().investments.dividends[0].id;
+    edit('scheduleB:foreignAccount','no');edit('scheduleB:foreignTrust','no');
+    edit(`dividends:${id}:payer`,'Example broker');edit(`dividends:${id}:ordinary`,'2000');edit(`dividends:${id}:qualified`,'1000');edit(`dividends:${id}:capitalGain`,'3000');
+    expect(root.querySelector('[data-line="scheduleB.line6"]')!.textContent).toContain('$2,000.00');
+    click('[data-page="1040"]');expect(root.querySelector('[data-line="form1040.line9"]')!.textContent).toContain('$57,000.00');
+    click('[data-line="form1040.line16"] .line-label-button');click('[data-source="qdcg.25"]');
+    expect(root.querySelector('article')!.getAttribute('aria-label')).toBe('Qualified dividends & gain tax');
+    expect(root.querySelectorAll('article [data-line^="qdcg."]')).toHaveLength(25);
+    click('[data-explain="qdcg.2"]');click('[data-source="form1040.line3a"]');click(`[data-source="dividends.${id}.qualified"]`);
+    expect(document.activeElement?.getAttribute('data-key')).toBe(`dividends:${id}:qualified`);
+    app.destroy();app=mountApp(root);expect(app.getDraft().investments.dividends[0].qualified).toBe('1000');
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it('locates Schedule B errors and withdraws income tax for special treatment',()=>{
+    app=mountApp(root);click('[data-action="example"]');click('[data-page="scheduleB"]');click('[data-action="add-interest"]');
+    const id=app.getDraft().investments.interest[0].id;
+    click('[data-page="1040"]');click('.return-status [data-source]');
+    expect(document.activeElement?.getAttribute('data-key')).toBe('scheduleB:foreignAccount');
+    edit('scheduleB:foreignAccount','no');edit('scheduleB:foreignTrust','no');edit(`interest:${id}:payer`,'Bank');edit(`interest:${id}:taxable`,'100');
+    const special=root.querySelector<HTMLInputElement>('[data-key="scheduleB:special"]')!;
+    special.checked=true;special.dispatchEvent(new Event('change',{bubbles:true}));click('[data-page="1040"]');
+    expect(root.querySelector('[data-line="form1040.line16"]')!.textContent).toContain('—');
+    expect(root.querySelector('.return-status')!.textContent).toContain('Return incomplete');
+    click('.return-status [data-source]');expect(document.activeElement?.getAttribute('data-key')).toBe('scheduleB:special');
+  });
+  it('removes a payer and recomputes totals without removing other records',()=>{
+    const d=exampleDraft();d.investments.foreignAccount='no';d.investments.foreignTrust='no';
+    d.investments.interest=[{id:'a',payer:'A',taxable:'100',exempt:'0'},{id:'b',payer:'B',taxable:'200',exempt:'0'}];
+    localStorage.setItem(STORAGE_KEY,encode(d));app=mountApp(root);click('[data-page="scheduleB"]');
+    click('[data-remove-investment="interest:a"]');expect(app.getDraft().investments.interest.map(p=>p.id)).toEqual(['b']);
+    expect(root.querySelector('[data-line="scheduleB.line4"]')!.textContent).toContain('$200.00');
   });
 });

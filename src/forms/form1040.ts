@@ -15,10 +15,10 @@ export const incomeLines = [
   line('1h','Other earned income','amount','Income-type classification and applicable supporting forms.'),
   line('1i','Nontaxable combat pay election','amount','Combat pay election and credit interactions.'),
   line('1z','Total wages and earned income','supported'),
-  line('2a','Tax-exempt interest','amount','Interest reporting and tax-exempt-income interactions.'),
-  line('2b','Taxable interest','amount','Form 1099-INT entry and Schedule B when required.'),
-  line('3a','Qualified dividends','amount','Form 1099-DIV entry and the qualified-dividends tax worksheet.'),
-  line('3b','Ordinary dividends','amount','Form 1099-DIV entry and Schedule B when required.'),
+  line('2a','Tax-exempt interest','supported'),
+  line('2b','Taxable interest','supported'),
+  line('3a','Qualified dividends','supported'),
+  line('3b','Ordinary dividends','supported'),
   line('3c','Child’s dividends included in line 3a or 3b','flag','Form 8814 and child-income reporting.'),
   line('4a','IRA distributions','amount','Retirement distribution entry, basis and rollover treatment.'),
   line('4b','Taxable IRA distributions','amount','IRA taxable-amount calculation and Form 8606 when required.'),
@@ -48,7 +48,7 @@ export const taxLines = [
   line('13b','Additional deductions from Schedule 1-A, line 38','amount','Schedule 1-A eligibility and deduction calculations.'),
   line('14','Total deductions','supported'),
   line('15','Taxable income','supported'),
-  line('16','Tax (including applicable Form 8814 / 4972 amounts)','result','Verified tax tables, preferential-rate worksheets and special tax forms.'),
+  line('16','Income tax before credits and other taxes','supported'),
   line('17','Tax from Schedule 2, line 3','amount','Schedule 2 Part I and applicable supporting tax forms.'),
   line('18','Tax before credits','result','Completed lines 16 and 17.'),
   line('19','Child tax credit / credit for other dependents','amount','Schedule 8812 and dependent eligibility.'),
@@ -90,8 +90,12 @@ export const contextItems = [
   line('digital-assets','Digital assets','flag','Digital-asset reporting and transaction classification.'),
   line('dependents','Dependents','flag','Dependent information, eligibility and related credits.'),
   line('filing-special','Special filing circumstances','flag','Nonresident-spouse elections, special filing periods and other filing-status details.'),
+  line('special-tax','Special tax methods: Forms 8615, 8814, 4972 or 2555','flag','Child investment-income tax, parent elections, lump-sum distribution tax and foreign earned income tax methods.'),
 ];
 export const itemized = line('itemized','Itemized deductions (Schedule A)','amount','Schedule A deductions and comparison with the standard deduction.');
 export const form1040Lines = [...incomeLines,...taxLines,...paymentLines,...refundLines,...owedLines];
 export const recordable1040 = [...form1040Lines,...contextItems,itemized].filter(f=>f.support==='amount'||f.support==='flag');
-export const unsupportedField = (id: string) => recordable1040.find(f=>f.line===id);
+// Old drafts may contain unverified notes for newly supported lines. Preserve
+// them for explicit review/clearing; never turn an unverified note into income.
+export const legacyInvestmentFields = incomeLines.filter(f=>['2a','2b','3a','3b'].includes(f.line)).map(f=>({...f,support:'amount' as const,needs:'Review the saved note, enter payer records in Schedule B, then clear the old note.'}));
+export const unsupportedField = (id: string) => [...recordable1040,...legacyInvestmentFields].find(f=>f.line===id);

@@ -1,5 +1,16 @@
 # 2025 capital gains prototype
 
+## Investment income extension
+
+The implemented extension in [investment-income-plan.md](investment-income-plan.md)
+adds payer records, Schedule B and a year-specific qualified-dividends/capital-gain
+worksheet. It reuses TelosTax's income, deduction and carryover calculations;
+the adapter replaces only the displayed line 16 calculation with the verified
+IRS table/worksheet path. `src/tax/2025` holds the new tax rules and extracted
+IRS table, separate from presentation. Two upstream income-tax gaps are
+documented there. The sections below describe the original capital-gains slice;
+the extension widens it only to the stated investment inputs and line 16.
+
 ## Paper-like Form 1040 presentation
 
 Form 1040 uses two paper-like HTML sheets, compact line rows, a section-label

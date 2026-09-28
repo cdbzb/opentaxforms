@@ -34,11 +34,22 @@ local reload connection; the production build does not.
 
 ## Current scope
 
-Working **2025** prototype: W-2 wages, ordinary covered stock sales without
-adjustments, Schedule D, supported Form 1040 calculations through taxable income, the
-2024 → 2025 Capital Loss Carryover Worksheet, and an outgoing-loss preview.
+Working **2025** prototype: W-2 wages, plain interest and dividends by payer,
+ordinary capital gain distributions, covered stock sales without adjustments,
+Schedule B, Schedule D, Form 1040 calculations through line 16 income tax,
+the Qualified Dividends and Capital Gain Tax Worksheet, the 2024 → 2025 Capital
+Loss Carryover Worksheet, and an outgoing-loss preview.
 Calculations reuse pinned MIT-licensed TelosTax modules with documented repairs
-for carryover-only returns and low-income carryforwards.
+for carryover-only returns and low-income carryforwards. The visible income-tax
+calculation uses the official IRS Tax Table below $100,000 and a traceable
+25-line preferential-rate worksheet; it corrects two documented upstream gaps.
+
+Open **Schedule B** to enter payer records and answer the foreign-account/trust
+questions. Qualified dividends are included in ordinary dividends, not added
+again. Capital gain distributions flow through Schedule D line 13. Select Form
+1040 line 16 to trace its tax-table lookup or worksheet calculation. Foreign
+accounts/trusts, special investment treatment and special tax methods remain
+unsupported; flagging them withholds all calculated results.
 
 The Form 1040 view preserves the full 2025 numbered-line sequence and sections.
 It uses two paper-like sheets with compact rows, aligned amount boxes and paired
@@ -60,25 +71,27 @@ removes its saved draft; keep an exported copy when needed.
 
 This is **not a filing-ready return**. It assumes eligibility for the base
 standard deduction, no dependent status, and no age/blindness additions. It
-does not determine filing-status eligibility, calculate a displayed tax/refund,
-support e-file, or handle other income and deduction scenarios. The broader
-Schedule 1/2/3/A/B and qualified-dividends worksheet roadmap is not implemented.
+does not determine filing-status or qualified-dividend eligibility, calculate
+total tax/refund, support e-file, or handle other income and deduction scenarios.
+Schedules 1/2/3/A and special tax methods remain unimplemented. Schedule B's
+foreign-account/trust reporting and special investment treatments are unsupported.
 The outgoing-loss preview is not an official 2026 worksheet.
 
 - [Architecture and scope](docs/prototype-architecture.md)
 - [Validation results and remaining checks](docs/prototype-validation.md)
 - [2025 IRS regression examples and boundary fixtures](docs/calculation-regressions-2025.md)
+- [Investment income implementation and verification](docs/investment-income-plan.md)
 - [Pinned engine and exact patches](vendor/telostax/PATCHES.md)
 - [Original candidate comparison](docs/reuse-evaluation.md)
 - [Original integration spike](spikes/reuse/README.md)
 - [Sharing the prototype and GitHub Pages deployment](docs/sharing.md)
 
-The regression corpus now has 142 passing tests, including published IRS
+The regression corpus now has 198 passing tests, including published IRS
 examples and independently worked carryover boundary fixtures. Desktop
 validation was reported by the project owner; detailed mobile, keyboard, print
-and network checks remain to be recorded. The next calculation expansion is
-Schedule B and the qualified-dividends/capital-gain tax worksheet, with new
-IRS fixtures required before exposing tax results.
+and network checks remain to be recorded. The next planned feature is local
+brokerage file import, starting with one verified export format, a preview,
+duplicate detection and source-row provenance.
 Original application code is MIT licensed; retained TelosTax attribution is in
 `vendor/telostax/LICENSE` and the distributed third-party notice.
 

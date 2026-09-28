@@ -20,17 +20,26 @@ export function fieldMoney(text: string, source: string, label: string, signed =
   }
 }
 export interface Sale { id: string; description: string; term: 'short' | 'long'; proceeds: string; basis: string }
+export interface Interest { id: string; payer: string; taxable: string; exempt: string }
+export interface Dividend { id: string; payer: string; ordinary: string; qualified: string; capitalGain: string }
+export interface Investments {
+  interest: Interest[]; dividends: Dividend[];
+  foreignAccount: 'unanswered' | 'no' | 'yes'; foreignTrust: 'unanswered' | 'no' | 'yes';
+  special: boolean;
+}
+export const emptyInvestments = (): Investments => ({interest:[],dividends:[],foreignAccount:'unanswered',foreignTrust:'unanswered',special:false});
 export interface Draft {
   schemaVersion: 1; taxYear: 2025; engine: typeof ENGINE;
   filingStatus: Status; wages: string; sales: Sale[];
   hasPriorLoss: boolean;
   prior: { taxable: string; short: string; long: string; deduction: string };
   unsupported1040: Record<string, { applies: boolean; amount: string }>;
+  investments: Investments;
 }
 export function emptyDraft(): Draft {
   return { schemaVersion: 1, taxYear: 2025, engine: ENGINE, filingStatus: 'single', wages: '0',
     sales: [{ id: 'sale-1', description: 'Stock sale', term: 'short', proceeds: '', basis: '' }],
-    hasPriorLoss: false, prior: { taxable: '', short: '', long: '', deduction: '' }, unsupported1040: {} };
+    hasPriorLoss: false, prior: { taxable: '', short: '', long: '', deduction: '' }, unsupported1040: {}, investments: emptyInvestments() };
 }
 export function exampleDraft(): Draft {
   const draft = emptyDraft();
@@ -57,7 +66,7 @@ export function validateShape(data: unknown): Draft {
   const knownKeys = (object: object, keys: string[]) => {
     if (Object.keys(object).some(key => !keys.includes(key))) throw new Error('Save file contains unsupported fields.');
   };
-  knownKeys(d, ['schemaVersion','taxYear','engine','filingStatus','wages','sales','hasPriorLoss','prior','unsupported1040']);
+  knownKeys(d, ['schemaVersion','taxYear','engine','filingStatus','wages','sales','hasPriorLoss','prior','unsupported1040','investments']);
   if (d.schemaVersion !== 1 || d.taxYear !== 2025 || d.engine !== ENGINE) throw new Error('Unsupported save version, engine revision, or tax year.');
   if (typeof d.filingStatus !== 'string' || !Object.hasOwn(filingStatuses, d.filingStatus) || typeof d.wages !== 'string' || typeof d.hasPriorLoss !== 'boolean') throw new Error('Invalid return fields.');
   if (!Array.isArray(d.sales) || d.sales.length > 100 || !d.prior || typeof d.prior !== 'object') throw new Error('Invalid sales or prior-year worksheet.');
@@ -92,7 +101,7 @@ export function validateShape(data: unknown): Draft {
     unsupported1040[id] = { applies: entry.applies, amount: entry.amount };
   }
   return { schemaVersion: 1, taxYear: 2025, engine: ENGINE, filingStatus: d.filingStatus as Status,
-    unsupported1040,
+    unsupported1040, investments: validateInvestments(d.investments),
     wages: amount(d.wages, 'form1040.line1a', 'W-2 wages · line 1a'), hasPriorLoss: d.hasPriorLoss,
     sales: sales.map((s,i) => ({ ...s, proceeds: amount(s.proceeds, `sale.${s.id}.proceeds`, `Proceeds for sale ${i+1} (Schedule D)`), basis: amount(s.basis, `sale.${s.id}.basis`, `Cost basis for sale ${i+1} (Schedule D)`) })),
     prior: {
@@ -101,4 +110,35 @@ export function validateShape(data: unknown): Draft {
       long: amount(prior.long as string, 'prior.input.long', priorLabels.long, true),
       deduction: amount(prior.deduction as string, 'prior.input.deduction', priorLabels.deduction),
     } };
+}
+
+function validateInvestments(data: unknown): Investments {
+  if (data === undefined) return emptyInvestments(); // Additive v1 migration.
+  const object = (value: unknown, keys: string[]) => {
+    if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).some(k=>!keys.includes(k))) throw new Error('Invalid investment record.');
+    return value as Record<string,unknown>;
+  };
+  const value = object(data, ['interest','dividends','foreignAccount','foreignTrust','special']);
+  for (const key of ['foreignAccount','foreignTrust']) if (typeof value[key] !== 'string' || !['unanswered','no','yes'].includes(value[key] as string)) throw new Error('Invalid Schedule B answer.');
+  if (typeof value.special !== 'boolean') throw new Error('Invalid investment treatment flag.');
+  const parse = (kind: 'interest'|'dividends', amounts: string[]) => {
+    const list = value[kind]; if (!Array.isArray(list) || list.length > 100) throw new Error('Invalid investment payer list.');
+    const ids = new Set<string>();
+    return list.map(entry => {
+      const record = object(entry, ['id','payer',...amounts]);
+      if (typeof record.id !== 'string' || !/^[a-zA-Z0-9-]{1,80}$/.test(record.id) || ids.has(record.id)) throw new Error('Invalid or duplicate investment payer ID.');
+      ids.add(record.id);
+      if (typeof record.payer !== 'string' || record.payer.length > 100) throw new Error('Invalid payer name.');
+      const result: Record<string,string> = {id:record.id,payer:record.payer};
+      for (const key of amounts) {
+        const raw = record[key]; if (typeof raw !== 'string') throw new Error('Invalid investment amount.');
+        if (raw.trim() || raw.length > 30) fieldMoney(raw,`${kind}.${record.id}.${key}`,`${record.payer || 'Payer'} · ${key}`);
+        result[key]=raw;
+      }
+      return result;
+    });
+  };
+  return {interest:parse('interest',['taxable','exempt']) as unknown as Interest[],
+    dividends:parse('dividends',['ordinary','qualified','capitalGain']) as unknown as Dividend[],
+    foreignAccount:value.foreignAccount as Investments['foreignAccount'], foreignTrust:value.foreignTrust as Investments['foreignTrust'], special:value.special};
 }

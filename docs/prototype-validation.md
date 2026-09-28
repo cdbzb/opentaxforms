@@ -2,7 +2,7 @@
 
 ## Completed
 
-- `npm test`: **142 tests pass** across calculation, storage, and DOM interaction
+- `npm test`: **198 tests pass** across calculation, storage, and DOM interaction
   suites. Tests invoke the patched engine, not the unmodified candidate checkout.
 - `npm run build`: TypeScript checks and Vite's static production build pass.
 - `npm run check:vendor`: 91 source files match the recorded upstream or local
@@ -11,6 +11,16 @@
 - The Vite development server starts at `http://127.0.0.1:5173/`.
 
 ## Calculation evidence
+
+The investment-income extension adds Schedule B payer totals and the full
+25-line qualified-dividends/capital-gain worksheet. Its 53-test suite checks
+all 2,062 IRS Tax Table intervals at both ends for five filing statuses,
+the published $25,300 MFJ example, every p.80 computation band, all filing-status
+capital-gain thresholds, the regular-tax comparison, loss interactions, input
+bounds and draft migration. See [implementation evidence](investment-income-plan.md).
+Three new UI tests cover payer entry/removal, tax-worksheet source navigation,
+reload and Schedule B error navigation. Existing unsupported-interest tests
+now verify preservation/review of legacy notes.
 
 `tests/calculation.test.ts` and `tests/irs-regression-2025.test.ts` form the
 tax-year-specific 2025 regression corpus. The expanded corpus includes four
