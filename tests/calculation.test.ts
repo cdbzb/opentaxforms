@@ -14,13 +14,7 @@ function loss(wages = '0', term: 'short'|'long' = 'short') {
   return d;
 }
 describe('2025 IRS carryover worksheet', () => {
-  // Pub.550 (2025), Capital Losses, p.102: Bob and Shelly have $7,000
-  // loss, $26,000 taxable income, use $3,000 and carry $4,000.
-  // https://www.irs.gov/pub/irs-prior/p550--2025.pdf#page=102
-  it('matches the published Bob and Shelly total (character assigned for this fixture)', () => {
-    const r = carryover({ taxableIncomeUnfloored: 26000, shortTerm: -7000, longTerm: 0, lossDeduction: 3000 });
-    expect(r.total).toBe(4000); expect(r.lines[4]).toBe(3000);
-  });
+  // Published examples and line-by-line fixtures: irs-regression-2025.test.ts.
   it.each([
     [-10000,-5000,0,3000,5000,0],
     [-2000,-5000,0,3000,4000,0],
@@ -43,12 +37,6 @@ describe('2025 IRS carryover worksheet', () => {
   });
 });
 describe('2025 forms integration and provenance', () => {
-  it('reproduces Bob and Shelly through the full engine with wages chosen to match published taxable income', () => {
-    // IRS gives loss/taxable income; wages and short-term character are synthetic.
-    const d=loss('60500');d.filingStatus='mfj';d.sales[0].basis='7000';const r=run(d);
-    expect(r.value('form1040.line15')).toBe(26000);
-    expect(r.value('next.8')).toBe(4000);
-  });
   it('nets multiple short- and long-term sales without losing carryover character', () => {
     const d=exampleDraft();d.sales=[
       {id:'a',description:'ST loss',term:'short',proceeds:'0',basis:'4000'},

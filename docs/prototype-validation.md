@@ -2,7 +2,7 @@
 
 ## Completed
 
-- `npm test`: **98 tests pass** across calculation, storage, and DOM interaction
+- `npm test`: **142 tests pass** across calculation, storage, and DOM interaction
   suites. Tests invoke the patched engine, not the unmodified candidate checkout.
 - `npm run build`: TypeScript checks and Vite's static production build pass.
 - `npm run check:vendor`: 91 source files match the recorded upstream or local
@@ -12,7 +12,12 @@
 
 ## Calculation evidence
 
-`tests/calculation.test.ts` is the tax-year-specific 2025 regression corpus.
+`tests/calculation.test.ts` and `tests/irs-regression-2025.test.ts` form the
+tax-year-specific 2025 regression corpus. The expanded corpus includes four
+published example/variant integrations, independently worked intermediate
+worksheet amounts, income boundaries to the cent, prior/current filing-status
+differences, and carryover/current-sale interactions. See
+[the fixture inventory and assumptions](calculation-regressions-2025.md).
 The pure worksheet tests cover negative and zero taxable income, partially
 absorbed losses, mixed short/long netting, deduction ordering, the MFS cap,
 cent rounding, and invalid numeric inputs. Form-level tests invoke the full
@@ -80,16 +85,24 @@ version/year/engine rejection, invalid amounts, unknown fields, duplicate sale
 identifiers, malformed JSON, and oversized imports. Unsupported fields are
 rejected rather than discarded and treated as an ordinary supported return.
 
-## Not yet verified
+## Desktop and deployment evidence
+
+Michael reported desktop validation completed on 2026-09-27. The specific
+checks were not enumerated, so this does not mark the individual checks below
+as completed. GitHub Pages deployment succeeded; HTTPS requests to the demo,
+JavaScript, CSS and third-party notice returned HTTP 200. This confirms asset
+delivery, not browser execution or network isolation while entering tax data.
+
+## Not yet independently verified
 
 The in-app browser runtime reported `Browser is not available: iab` during
 this session; a subsequent full-form check also found no available browsers.
 The paper-like layout check likewise found no available browser connection.
-Consequently **no real-browser visual or network verification
+Consequently **no agent-controlled real-browser visual or network verification
 was completed**. DOM tests do not establish layout, accessibility, actual file
 download/reimport behavior, browser print output, or network isolation.
 
-Before widening scope or publishing:
+Outstanding checks for the shared prototype:
 
 1. At desktop and narrow mobile widths, check every form, focus order, source
    navigation, monetary input, long descriptions, and blank/error states.
@@ -98,8 +111,9 @@ Before widening scope or publishing:
 4. Record browser requests for edit, reload, save/load and worksheet navigation;
    confirm no taxpayer values leave the device. Test the static production build
    separately from Vite's development reload connection.
-5. Broaden independent IRS examples and review patched engine interactions
-   before exposing additional schedules or complete tax/refund results.
+5. The current calculation corpus has been expanded as documented above.
+   Add independent IRS fixtures for each new rule and review patched engine
+   interactions before exposing additional schedules or tax/refund results.
 
 The original unpatched upstream suite results remain historical evaluation
 evidence. They are not claimed as a full rerun of the patched extraction.

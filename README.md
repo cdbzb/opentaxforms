@@ -67,13 +67,18 @@ The outgoing-loss preview is not an official 2026 worksheet.
 
 - [Architecture and scope](docs/prototype-architecture.md)
 - [Validation results and remaining checks](docs/prototype-validation.md)
+- [2025 IRS regression examples and boundary fixtures](docs/calculation-regressions-2025.md)
 - [Pinned engine and exact patches](vendor/telostax/PATCHES.md)
 - [Original candidate comparison](docs/reuse-evaluation.md)
 - [Original integration spike](spikes/reuse/README.md)
 - [Sharing the prototype and GitHub Pages deployment](docs/sharing.md)
 
-The next release gate is real-browser visual, keyboard, print, and network
-verification. Then expand the IRS regression corpus before adding more forms.
+The regression corpus now has 142 passing tests, including published IRS
+examples and independently worked carryover boundary fixtures. Desktop
+validation was reported by the project owner; detailed mobile, keyboard, print
+and network checks remain to be recorded. The next calculation expansion is
+Schedule B and the qualified-dividends/capital-gain tax worksheet, with new
+IRS fixtures required before exposing tax results.
 Original application code is MIT licensed; retained TelosTax attribution is in
 `vendor/telostax/LICENSE` and the distributed third-party notice.
 
