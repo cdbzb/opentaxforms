@@ -49,6 +49,13 @@ const knownBoxes: Record<string,string[]> = {
   '1099INT':[...Array.from({length:17},(_,i)=>String(i+1)),''],
   '1099OID':[...Array.from({length:14},(_,i)=>String(i+1)),''],
 };
+// Metadata stays visible in the source preview. It is not a monetary input.
+// Match both box and label so an unexpected layout cannot hide an amount.
+const metadata: Record<string,Record<string,string>> = {
+  '1099DIV': {'8':'Foreign Country or U.S. Possession'},
+  '1099INT': {'7':'Foreign Country or U.S. Possession'},
+  '1099OID': {'7':'Description'},
+};
 
 export function parseSchwab(text: string): SchwabPreview {
   const records=readCsv(text);
@@ -59,9 +66,14 @@ export function parseSchwab(text: string): SchwabPreview {
     const c=record.cells; if(c.every(v=>!v))continue;
     if(c[0]==='Account' && !section && !account && c.length===2 && c[1]){account=true;continue;}
     if(c[0]==='Tax Year' && !section && !year && c.length===2 && /^20\d{2}$/.test(c[1])){result.year=Number(c[1]);year=true;continue;}
-    if(/^Form 1099\s*(DIV|INT|OID|B)$/.test(c[0]) && c.slice(1).every(v=>!v)) {
-      section={form:c[0].replace(/^Form /,'').replace(/\s/g,''),row:record.row,corrected:false,boxes:[],headers:[],records:[]};
-      result.sections.push(section);summaryHeader=false;saleHeaders=0;correctionSeen=false;continue;
+    // Every form heading resets the section, even for an unsupported form.
+    // Otherwise a 1099-MISC royalties box 2 can be misread as 1099-INT box 2.
+    if(/^Form(?:\s|$)/i.test(c[0])) {
+      section={form:c[0].replace(/^Form\s*/i,'').replace(/[\s-]/g,'').toUpperCase(),row:record.row,corrected:false,boxes:[],headers:[],records:[]};
+      result.sections.push(section);summaryHeader=false;saleHeaders=0;correctionSeen=false;
+      if(!Object.hasOwn(knownBoxes,section.form) && section.form!=='1099B')issue(record.row,`${section.form || 'Unnamed form'}: tax calculations for this form are not supported. Its records are retained below for review.`);
+      if(c.slice(1).some(Boolean)){section.records.push(record);issue(record.row,'Unexpected data in a form heading.');}
+      continue;
     }
     if(!section){issue(record.row,'Unrecognized metadata or missing form section.');continue;}
     if(c[0]==='Corrected' && !summaryHeader && !saleHeaders && !correctionSeen && ['Yes','No'].includes(c[1]) && c.slice(2).every(v=>!v)) {
@@ -81,11 +93,19 @@ export function parseSchwab(text: string): SchwabPreview {
       continue;
     }
     if(!summaryHeader && c.length===6 && c.slice(0,5).join('|')==='Box|Description|Amount|Total|Details' && !c[5]){summaryHeader=true;continue;}
+    // Unknown forms are already blocked at the section level. Preserve unfamiliar
+    // layouts without generating a spurious error for every record in the form.
+    if(!Object.hasOwn(knownBoxes,section.form) && (!summaryHeader || c.length!==6 || c[5])){section.records.push(record);continue;}
     if(!summaryHeader || c.length!==6 || c[5]){section.records.push(record);issue(record.row,'Unrecognized summary columns or extra data.');continue;}
     const box: SummaryBox={row:record.row,box:c[0],description:c[1],amount:c[2],total:c[3],details:c[4]};
     if(section.boxes.some(b=>b.box===box.box))issue(record.row,'Duplicate box in this form.');
     section.boxes.push(box);
+    if(!Object.hasOwn(knownBoxes,section.form))continue;
     if(!knownBoxes[section.form]?.includes(box.box) || (!box.box && box.description!=='FATCA filing requirement')){issue(record.row,'Unknown tax box; review is required.');continue;}
+    if(metadata[section.form]?.[box.box]===box.description) {
+      if(box.amount || box.total)issue(record.row,`${section.form} box ${box.box}: metadata belongs in Details; unexpected Amount or Total requires review.`);
+      continue;
+    }
     if(required[section.form]?.includes(box.box)) {
       try {boxAmount(box);}catch(e){issue(record.row,(e as Error).message);}
     }else {
@@ -118,7 +138,7 @@ export function parseSchwab(text: string): SchwabPreview {
   const ordinary=result.mappings.find(m=>m.key==='ordinary'), qualified=result.mappings.find(m=>m.key==='qualified');
   for(const s of result.sections) {
     if(s.form==='1099B' && !s.headers.length)issue(s.row,'Missing recognized 1099-B headers.');
-    if(s.form!=='1099B' && !s.boxes.some(b=>b.box==='' && b.description==='FATCA filing requirement'))issue(s.row,'Incomplete summary section: missing FATCA footer.');
+    if(Object.hasOwn(knownBoxes,s.form) && !s.boxes.some(b=>b.box==='' && b.description==='FATCA filing requirement'))issue(s.row,'Incomplete summary section: missing FATCA footer.');
   }
   if(ordinary && qualified && Number(qualified.value)>Number(ordinary.value))issue(qualified.rows[0],'Qualified dividends exceed ordinary dividends.');
   if(!result.mappings.length)issue(1,'No supported interest or dividend records to apply.');

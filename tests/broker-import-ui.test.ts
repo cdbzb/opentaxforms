@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { webcrypto } from 'node:crypto';
 import { mountApp } from '../src/ui/main';
-import { csv, schwabRows, salesSection, sale } from './fixtures/schwab';
+import { csv, schwabRows, salesSection, sale, summaryHeader, box, footer } from './fixtures/schwab';
 import { encode, STORAGE_KEY } from '../src/storage/local';
 
 let root: HTMLElement, app: ReturnType<typeof mountApp>;
@@ -65,4 +65,17 @@ it('protects an unreadable existing browser draft when a CSV is reviewed',async(
   await openCSV();review();click('[data-action="apply-broker"]');
   expect(localStorage.getItem(STORAGE_KEY)).toBe('corrupt original');expect(app.getDraft().brokerImports).toEqual([]);
   expect(root.textContent).toContain('existing browser draft could not be read');
+});
+
+it('summarizes hundreds of sales with collapsible record ranges and isolates MISC in the preview',async()=>{
+  const rows=schwabRows();rows.push(['Form 1099MISC',''],summaryHeader,box('2','Royalties','25'),footer());
+  const start=rows.length+4;rows.push(...salesSection(Array.from({length:492},()=>sale())));
+  const before=encode(app.getDraft());await openCSV(csv(rows));
+  const repeated=root.querySelector<HTMLDetailsElement>('.import-issues details')!;
+  expect(repeated.open).toBe(false);expect(repeated.querySelector('summary')!.textContent).toContain('492 records');
+  expect(repeated.querySelector('p')!.textContent).toBe(`CSV records: ${start}–${start+491}`);
+  expect(root.querySelector('.import-issues')!.textContent).not.toContain('Duplicate box');
+  const misc=[...root.querySelectorAll('.import-section')].find(s=>s.querySelector('summary')!.textContent!.startsWith('1099MISC'))!;
+  expect(misc.textContent).toContain('Royalties');expect(misc.textContent).toContain('25');
+  expect(root.querySelector<HTMLButtonElement>('[data-action="apply-broker"]')!.disabled).toBe(true);expect(encode(app.getDraft())).toBe(before);
 });

@@ -57,6 +57,45 @@ describe('Schwab local import',()=>{
     const rows=schwabRows();rows[4][1]='Yes';rows.push(...schwabRows().slice(3));const p=parseSchwab(csv(rows));
     expect(p.issues.some(i=>i.message.includes('Corrected'))).toBe(true);expect(p.issues.some(i=>i.message.includes('Multiple'))).toBe(true);
   });
+  it('keeps MISC royalties in their own section between INT and OID',()=>{
+    const rows=schwabRows();const miscStart=rows.length+1;
+    rows.push(['Form 1099MISC',''],summaryHeader,box('1','Rents'),box('2','Royalties','25.00'),box('15a','Section 409A deferrals'),footer(),
+      ['Form 1099OID',''],summaryHeader,box('7','Description','','Synthetic bond'),box('8','Treasury OID','12.00'),footer());
+    const p=parseSchwab(csv(rows));
+    expect(p.sections.map(s=>s.form)).toEqual(['1099DIV','1099INT','1099MISC','1099OID']);
+    expect(p.sections[2].boxes.find(b=>b.box==='2')!.total).toBe('25.00');
+    expect(p.sections[1].boxes.find(b=>b.box==='2')!.total).toBe('');
+    expect(p.issues).toEqual([{row:miscStart,message:expect.stringContaining('1099MISC: tax calculations')},{row:rows.length-1,message:expect.stringContaining('1099OID box 8')}]);
+    expect(p.mappings.find(m=>m.key==='taxable')!.value).toBe('58.01');
+    expect(()=>applySchwab(emptyDraft(),p,digest,'misc.csv',true)).toThrow();
+  });
+  it.each(['Form 1099-MISC','Form 1099 NEC','Form W-2','Form 9999FUTURE'])('isolates an unfamiliar form heading %s without interpreting its values as interest',heading=>{
+    const rows=schwabRows();rows.push([heading,''],['Unfamiliar','layout','100'],['1','Unmapped','200']);
+    const p=parseSchwab(csv(rows));expect(p.sections.at(-1)!.records).toHaveLength(2);
+    expect(p.issues).toHaveLength(1);expect(p.issues[0].message).toContain('tax calculations for this form are not supported');
+    expect(p.mappings.find(m=>m.key==='taxable')!.value).toBe('58.01');
+    expect(()=>applySchwab(emptyDraft(),p,digest,'unknown.csv',true)).toThrow();
+  });
+  it('retains descriptions and country metadata without treating them as income',()=>{
+    const rows=schwabRows();const divCountry=rows.find(r=>r[0]==='8')!;divCountry[1]='Foreign Country or U.S. Possession';divCountry[4]='Synthetic country';
+    const intCountry=rows.find(r=>r[0]==='7' && r[1]==='Interest box 7')!;intCountry[1]='Foreign Country or U.S. Possession';intCountry[4]='Synthetic country';
+    rows.push(['Form 1099OID',''],summaryHeader,box('7','Description','','Synthetic bond'),footer());
+    const p=parseSchwab(csv(rows));expect(p.issues).toEqual([]);expect(p.sections.at(-1)!.boxes[0].details).toBe('Synthetic bond');
+    expect(p.sections[0].boxes.find(b=>b.box==='8')!.details).toBe('Synthetic country');
+    expect(p.mappings).toEqual(preview().mappings);
+    rows.find(r=>r[0]==='7')![3]='15.00';
+    expect(parseSchwab(csv(rows)).issues.some(i=>i.message.includes('1099DIV box 7'))).toBe(true);
+  });
+  it('does not hide amounts or unknown labels in supposed metadata fields',()=>{
+    for(const [description,amount,total] of [['Description','10',''],['Description','','10'],['Unexpected label','','']]) {
+      const rows=schwabRows();rows.push(['Form 1099OID',''],summaryHeader,['7',description,amount,total,'Synthetic bond',''],footer());
+      const p=parseSchwab(csv(rows));expect(p.issues).toHaveLength(1);expect(()=>applySchwab(emptyDraft(),p,digest,'metadata.csv',true)).toThrow();
+    }
+  });
+  it('retains unexpected data in a form heading and blocks application',()=>{
+    const rows=schwabRows();rows[3][1]='unexpected';const p=parseSchwab(csv(rows));
+    expect(p.sections[0].records[0].cells).toEqual(rows[3]);expect(p.issues.some(i=>i.message.includes('form heading'))).toBe(true);
+  });
   it.each(['1.234','NaN','1e3','-1','(20)','$1,2','1,00.00'])('rejects malformed monetary values %s',v=>{
     const rows=schwabRows();rows[6][3]=v;expect(parseSchwab(csv(rows)).issues.length).toBeGreaterThan(0);
   });

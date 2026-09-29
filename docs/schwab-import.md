@@ -44,3 +44,23 @@ No new tax calculation engine or tax rule is introduced. Mapping sources:
 Validation covers parsing, supported mapping through the existing calculation,
 unsupported and malformed input, wrong years, corrections, duplicate files,
 atomic application, provenance persistence and browser DOM interactions.
+
+## Additional form sections and review messages
+
+Every `Form ...` heading now starts a separate section. Unimplemented forms,
+including 1099-MISC, receive a section-level blocking notice; their rows are
+retained without being mapped to the preceding form's box numbers. Unknown
+layouts remain review-only. The royalty fields in a MISC section must never
+be interpreted as interest fields.
+
+OID box 7 descriptions and DIV box 8 / INT box 7 country names are metadata
+when both their box identifiers and descriptions match the observed layout.
+Text in their Details column stays visible without generating an unsupported
+amount error. Unexpected Amount/Total values still block, as do foreign tax
+paid, OID income, premiums, section 199A dividends, sales and other unsupported
+monetary items. No calculation scope has expanded.
+
+Repeated review messages show counts with collapsed record lists. Consecutive
+record numbers are displayed as ranges. Synthetic regressions include an
+INT → MISC → OID transition and a 492-sale review. The separate local 2025
+sample confirms section recognition without including customer data in tests.

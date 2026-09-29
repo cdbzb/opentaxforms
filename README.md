@@ -87,7 +87,7 @@ The outgoing-loss preview is not an official 2026 worksheet.
 - [Original integration spike](spikes/reuse/README.md)
 - [Sharing the prototype and GitHub Pages deployment](docs/sharing.md)
 
-The regression corpus now has 233 passing tests, including published IRS
+The regression corpus now has 242 passing tests, including published IRS
 examples and independently worked carryover boundary fixtures. Desktop
 validation was reported by the project owner; detailed mobile, keyboard, print
 and network checks remain to be recorded. Open **Brokerage import** to review a Schwab tax CSV locally. Supported 2025

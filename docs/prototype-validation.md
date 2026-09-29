@@ -2,7 +2,7 @@
 
 ## Completed
 
-- `npm test`: **233 tests pass** across calculation, storage, and DOM interaction
+- `npm test`: **242 tests pass** across calculation, storage, and DOM interaction
   suites. Tests invoke the patched engine, not the unmodified candidate checkout.
 - `npm run build`: TypeScript checks and Vite's static production build pass.
 - `npm run check:vendor`: 91 source files match the recorded upstream or local
@@ -97,7 +97,7 @@ rejected rather than discarded and treated as an ordinary supported return.
 
 ## Brokerage import evidence
 
-The Schwab importer adds 28 parser/mapping/storage tests and seven DOM interaction
+The Schwab importer adds 36 parser/mapping/storage tests and eight DOM interaction
 checks. They verify review before application, canonical file duplicate checks,
 source receipts through edits/reload, all-or-nothing rejection, escaped CSV text,
 pending read cancellation, and Schedule B source navigation. Fixtures contain
@@ -105,6 +105,13 @@ invented data only. The supplied local 2024 sample was parsed separately: all
 five sections and 31 sale records were recognized, with no unknown-structure
 errors. Its year, correction and unsupported activity prevent application.
 The sample was not added to the repository. The parser has no network calls.
+
+A later 2025 export exposed a section-boundary bug: 1099-MISC was previously
+read as part of 1099-INT. The parser now isolates all form headings and retains
+unsupported forms for review. The local 2025 sample parses 20 sections, including
+16 OID sections and 492 sales, with no structural or metadata-only errors.
+Unsupported calculations still block application. Repeated issues have collapsed
+record ranges, covered by a synthetic 492-sale DOM test.
 
 ## Desktop and deployment evidence
 

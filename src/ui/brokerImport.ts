@@ -2,6 +2,15 @@ import type { Draft } from '../adapters/model';
 import type { SchwabPreview } from '../imports/schwab';
 
 const escape=(s:unknown)=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
+function recordRanges(records: number[]): string {
+  const sorted=[...new Set(records)].sort((a,b)=>a-b), ranges:string[]=[];
+  for(let i=0;i<sorted.length;i++) {
+    const start=sorted[i];let end=start;
+    while(sorted[i+1]===end+1)end=sorted[++i];
+    ranges.push(start===end?String(start):`${start}–${end}`);
+  }
+  return ranges.join(', ');
+}
 export interface ImportReview { file: string; digest: string; preview: SchwabPreview; reviewed: boolean }
 export function brokerageImport(draft: Draft, review: ImportReview|null, loading: boolean): string {
   const p=review?.preview;
@@ -16,7 +25,7 @@ export function brokerageImport(draft: Draft, review: ImportReview|null, loading
     ${loading?'<p role="status">Reading CSV on this device…</p>':''}
     ${review && p ? `<section aria-label="Brokerage import preview"><h3>${escape(review.file)} · ${p.year || 'Unknown year'}</h3><p><strong>Preview only — no values from this file have been added.</strong> CSV record numbers include headers and blank records; a quoted multiline field counts as one record.</p>
       ${duplicate?'<div class="alert" role="alert">This file has already been imported. Renaming a file or deleting its payer records does not remove the import receipt.</div>':''}
-      ${p.issues.length?`<div class="alert" role="alert"><strong>File cannot be applied</strong><ul>${[...issues].map(([message,rows])=>`<li>Record${rows.length===1?'':'s'} ${rows.join(', ')}: ${escape(message)}</li>`).join('')}</ul></div>`:''}
+      ${p.issues.length?`<div class="alert import-issues" role="alert"><strong>File cannot be applied · ${issues.size} issue types</strong><p>The following items need support or review. Expand a repeated issue to locate its CSV records.</p><ul>${[...issues].map(([message,rows])=>`<li>${rows.length===1?`${escape(message)} <span class="issue-records">CSV record ${rows[0]}</span>`:`<details><summary>${escape(message)} <span class="issue-records">${new Set(rows).size} records</span></summary><p>CSV records: ${recordRanges(rows)}</p></details>`}</li>`).join('')}</ul></div>`:''}
       <h4>Proposed amounts · subject to the checks above</h4>
       ${table(['Destination','Amount','Source form / boxes','CSV records'],p.mappings.map(m=>[`${m.kind==='interest'?'Interest':'Dividends'} · ${m.key}`,m.value,`${m.form} · ${m.boxes.join(' + ')}`,m.rows.join(', ')]))}
       <p>Taxable interest combines 1099-INT boxes 1 and 3. Qualified dividends are included in ordinary dividends. No source values are added when this file has an unresolved issue.</p>
