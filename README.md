@@ -81,17 +81,20 @@ The outgoing-loss preview is not an official 2026 worksheet.
 - [Validation results and remaining checks](docs/prototype-validation.md)
 - [2025 IRS regression examples and boundary fixtures](docs/calculation-regressions-2025.md)
 - [Investment income implementation and verification](docs/investment-income-plan.md)
+- [Schwab CSV import scope and source mapping](docs/schwab-import.md)
 - [Pinned engine and exact patches](vendor/telostax/PATCHES.md)
 - [Original candidate comparison](docs/reuse-evaluation.md)
 - [Original integration spike](spikes/reuse/README.md)
 - [Sharing the prototype and GitHub Pages deployment](docs/sharing.md)
 
-The regression corpus now has 198 passing tests, including published IRS
+The regression corpus now has 233 passing tests, including published IRS
 examples and independently worked carryover boundary fixtures. Desktop
 validation was reported by the project owner; detailed mobile, keyboard, print
-and network checks remain to be recorded. The next planned feature is local
-brokerage file import, starting with one verified export format, a preview,
-duplicate detection and source-row provenance.
+and network checks remain to be recorded. Open **Brokerage import** to review a Schwab tax CSV locally. Supported 2025
+interest/dividend files can be appended after review; source receipts and duplicate
+detection persist with the draft. Wrong years, corrected statements, sales, OID
+and unsupported boxes block the whole file. The next calculation expansion
+needed for broader brokerage imports is Form 8949 and bond/OID treatment.
 Original application code is MIT licensed; retained TelosTax attribution is in
 `vendor/telostax/LICENSE` and the distributed third-party notice.
 

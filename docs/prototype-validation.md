@@ -2,7 +2,7 @@
 
 ## Completed
 
-- `npm test`: **198 tests pass** across calculation, storage, and DOM interaction
+- `npm test`: **233 tests pass** across calculation, storage, and DOM interaction
   suites. Tests invoke the patched engine, not the unmodified candidate checkout.
 - `npm run build`: TypeScript checks and Vite's static production build pass.
 - `npm run check:vendor`: 91 source files match the recorded upstream or local
@@ -94,6 +94,17 @@ local interactions make no calls to the stubbed `fetch` function.
 version/year/engine rejection, invalid amounts, unknown fields, duplicate sale
 identifiers, malformed JSON, and oversized imports. Unsupported fields are
 rejected rather than discarded and treated as an ordinary supported return.
+
+## Brokerage import evidence
+
+The Schwab importer adds 28 parser/mapping/storage tests and seven DOM interaction
+checks. They verify review before application, canonical file duplicate checks,
+source receipts through edits/reload, all-or-nothing rejection, escaped CSV text,
+pending read cancellation, and Schedule B source navigation. Fixtures contain
+invented data only. The supplied local 2024 sample was parsed separately: all
+five sections and 31 sale records were recognized, with no unknown-structure
+errors. Its year, correction and unsupported activity prevent application.
+The sample was not added to the repository. The parser has no network calls.
 
 ## Desktop and deployment evidence
 

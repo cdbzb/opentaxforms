@@ -1,3 +1,4 @@
+import { validateReceipts, type ImportReceipt } from '../imports/receipts';
 import { unsupportedField } from '../forms/form1040';
 export const ENGINE = 'telostax-989fa6e6b7e4-opentaxforms-1';
 export const filingStatuses = { single: 'Single', mfj: 'Married filing jointly', mfs: 'Married filing separately', hoh: 'Head of household', qss: 'Qualifying surviving spouse' } as const;
@@ -35,11 +36,12 @@ export interface Draft {
   prior: { taxable: string; short: string; long: string; deduction: string };
   unsupported1040: Record<string, { applies: boolean; amount: string }>;
   investments: Investments;
+  brokerImports: ImportReceipt[];
 }
 export function emptyDraft(): Draft {
   return { schemaVersion: 1, taxYear: 2025, engine: ENGINE, filingStatus: 'single', wages: '0',
     sales: [{ id: 'sale-1', description: 'Stock sale', term: 'short', proceeds: '', basis: '' }],
-    hasPriorLoss: false, prior: { taxable: '', short: '', long: '', deduction: '' }, unsupported1040: {}, investments: emptyInvestments() };
+    hasPriorLoss: false, prior: { taxable: '', short: '', long: '', deduction: '' }, unsupported1040: {}, investments: emptyInvestments(), brokerImports: [] };
 }
 export function exampleDraft(): Draft {
   const draft = emptyDraft();
@@ -66,7 +68,7 @@ export function validateShape(data: unknown): Draft {
   const knownKeys = (object: object, keys: string[]) => {
     if (Object.keys(object).some(key => !keys.includes(key))) throw new Error('Save file contains unsupported fields.');
   };
-  knownKeys(d, ['schemaVersion','taxYear','engine','filingStatus','wages','sales','hasPriorLoss','prior','unsupported1040','investments']);
+  knownKeys(d, ['schemaVersion','taxYear','engine','filingStatus','wages','sales','hasPriorLoss','prior','unsupported1040','investments','brokerImports']);
   if (d.schemaVersion !== 1 || d.taxYear !== 2025 || d.engine !== ENGINE) throw new Error('Unsupported save version, engine revision, or tax year.');
   if (typeof d.filingStatus !== 'string' || !Object.hasOwn(filingStatuses, d.filingStatus) || typeof d.wages !== 'string' || typeof d.hasPriorLoss !== 'boolean') throw new Error('Invalid return fields.');
   if (!Array.isArray(d.sales) || d.sales.length > 100 || !d.prior || typeof d.prior !== 'object') throw new Error('Invalid sales or prior-year worksheet.');
@@ -101,7 +103,7 @@ export function validateShape(data: unknown): Draft {
     unsupported1040[id] = { applies: entry.applies, amount: entry.amount };
   }
   return { schemaVersion: 1, taxYear: 2025, engine: ENGINE, filingStatus: d.filingStatus as Status,
-    unsupported1040, investments: validateInvestments(d.investments),
+    unsupported1040, investments: validateInvestments(d.investments), brokerImports: validateReceipts(d.brokerImports, money),
     wages: amount(d.wages, 'form1040.line1a', 'W-2 wages · line 1a'), hasPriorLoss: d.hasPriorLoss,
     sales: sales.map((s,i) => ({ ...s, proceeds: amount(s.proceeds, `sale.${s.id}.proceeds`, `Proceeds for sale ${i+1} (Schedule D)`), basis: amount(s.basis, `sale.${s.id}.basis`, `Cost basis for sale ${i+1} (Schedule D)`) })),
     prior: {

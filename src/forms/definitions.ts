@@ -1,5 +1,5 @@
 import { form1040Lines, contextItems, itemized } from './form1040';
-export type Page = '1040' | 'scheduleB' | 'scheduleD' | 'prior' | 'next' | 'qdcg';
+export type Page = '1040' | 'scheduleB' | 'scheduleD' | 'prior' | 'next' | 'qdcg' | 'imports';
 export const sources = {
   form1040: 'https://www.irs.gov/pub/irs-prior/f1040--2025.pdf',
   instructions1040: 'https://www.irs.gov/pub/irs-prior/i1040gi--2025.pdf',

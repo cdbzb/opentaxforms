@@ -1,5 +1,7 @@
 import './style.css';
 import './form1040.css';
+import { parseSchwab, fingerprint, applySchwab, MAX_CSV_BYTES } from '../imports/schwab';
+import { brokerageImport, sourceReceipt, type ImportReview } from './brokerImport';
 import { calculate, type Calculation } from '../adapters/calculate';
 import { emptyDraft, exampleDraft, filingStatuses, priorLabels, type Draft, type Sale } from '../adapters/model';
 import { fields, fieldFor, sources, type Page } from '../forms/definitions';
@@ -9,11 +11,12 @@ import { incomeLines, taxLines, paymentLines, refundLines, owedLines, contextIte
 const escape = (s: unknown) => String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]!));
 const currency = (n: number) => new Intl.NumberFormat('en-US', { style:'currency', currency:'USD' }).format(n);
 const link = (url: string, label = 'IRS instructions ↗') => `<a href="${url}" target="_blank" rel="noopener noreferrer">${label}</a>`;
-const names: Record<Page,string> = { '1040': 'Form 1040', scheduleB: 'Schedule B', scheduleD: 'Schedule D', prior: '2024 → 2025 carryover', next: 'Carryforward preview', qdcg: 'Qualified dividends & gain tax' };
+const names: Record<Page,string> = { '1040': 'Form 1040', scheduleB: 'Schedule B', scheduleD: 'Schedule D', prior: '2024 → 2025 carryover', next: 'Carryforward preview', qdcg: 'Qualified dividends & gain tax', imports: 'Brokerage import' };
 export function mountApp(root: HTMLElement, storage?: Storage) {
   let draft: Draft = emptyDraft(); let page: Page = '1040'; let selected = 'form1040.line7a';
   let message = ''; let saveStatus = 'Stored only in this browser'; let protectSaved = false;
   try { storage ??= window.localStorage; draft = load(storage) || draft; } catch { message = 'Browser storage could not be read. Any existing draft has not been overwritten. Import a valid file or start a new draft.'; protectSaved = true; saveStatus = 'Browser save unavailable'; }
+  let brokerReview: ImportReview|null=null; let brokerLoading=false; let brokerRead=0;
   let result: Calculation = calculate(draft);
   const amount = (id: string) => result.nodes.has(id) ? currency(result.nodes.get(id)!.value) : '—';
   function persist() {
@@ -59,7 +62,7 @@ export function mountApp(root: HTMLElement, storage?: Storage) {
     const inv=draft.investments;
     const answer=(key:'foreignAccount'|'foreignTrust',label:string)=>`<label class="entry"><span>${label}</span><select data-key="scheduleB:${key}" aria-label="${label}" ${result.errorSource===`scheduleB.${key}`?'aria-invalid="true"':''}><option value="unanswered" ${inv[key]==='unanswered'?'selected':''}>Choose an answer</option><option value="no" ${inv[key]==='no'?'selected':''}>No</option><option value="yes" ${inv[key]==='yes'?'selected':''}>Yes — needs additional reporting</option></select></label>`;
     return `<div class="form-heading"><div><p class="eyebrow">Form 1040 attachment · interest and ordinary dividends</p><h2>Schedule <strong>B</strong></h2></div><span class="form-year">2025</span></div>
-      <div class="note-box">Enter payer totals from your tax records. Ordinary dividends include qualified dividends. This working schedule is available even below the filing threshold. Brokerage import is not available yet.</div>
+      <div class="note-box">Enter payer totals from your tax records. Ordinary dividends include qualified dividends. This working schedule is available even below the filing threshold. <button class="text-button" data-page="imports">Import a Schwab tax CSV →</button></div>
       <div class="form-section"><div class="section-title"><span>I</span><h3>Interest · line 1</h3></div>
       <p class="field-note">Taxable interest includes plain bank interest and U.S. Treasury/savings-bond interest with no exclusions or adjustments. Enter tax-exempt interest separately; it goes to Form 1040 line 2a, not Schedule B line 1.</p>
       ${inv.interest.map((p,i)=>`<fieldset class="sale"><legend>Interest payer ${i+1}</legend>${input(`interest:${p.id}:payer`,'Interest payer name',p.payer,{text:true})}<div class="input-grid">${input(`interest:${p.id}:taxable`,'Taxable interest',p.taxable)}${input(`interest:${p.id}:exempt`,'Tax-exempt interest',p.exempt)}</div><button class="text-button" data-remove-investment="interest:${p.id}">Remove interest payer ${i+1}</button></fieldset>`).join('')}
@@ -146,7 +149,7 @@ export function mountApp(root: HTMLElement, storage?: Storage) {
     const controls=support?`<div class="support-panel"><strong>Not supported yet</strong><p>Needed: ${escape(support.needs)}</p>${support.support==='amount'?`<label class="unsupported-checkbox"><input type="checkbox" data-key="unsupported:${support.line}:applies" ${record?.applies?'checked':''} /> This applies to me (amount may be unknown)</label>`:''}${record&&(record.applies||record.amount.trim()!=='')?`<p>Saved as an unverified note${record.amount.trim()!==''?`: ${escape(record.amount)}`:'. Amount not entered.'}</p><button class="secondary full" data-clear-unsupported="${support.line}">Clear this entry</button>`:''}${['amount','flag'].includes(support.support)?`<button class="secondary full" data-source="${selected}">Go to this line →</button>`:''}</div>`:'';
     return `<p class="eyebrow">Understand this number</p><div class="inspect-title"><span class="inspect-marker">↗</span><div><span class="muted">${names[f.page]} · ${f.line==='Input'?'Input':`Line ${f.line}`}</span><h3>${escape(f.label)}</h3></div></div><div class="inspect-value">${support?'Unsupported':selected==='filingStatus'?filingStatuses[draft.filingStatus]:amount(selected)}</div>${controls}<p>${escape(f.explanation)}</p>
       ${support?'':node ? `<div class="formula"><span>${node.entered?'Source':'Calculation'}</span><p>${escape(node.explanation)}</p></div><h4>${node.inputs.length?'Comes from':'Source detail'}</h4>${node.inputs.length?`<ul class="source-list">${node.inputs.map(id=>`<li><button data-source="${id}"><span>${escape(fieldFor(id).label)}<small>${escape(names[fieldFor(id).page])} · ${fieldFor(id).line}</small></span><strong>${id==='filingStatus'?filingStatuses[draft.filingStatus]:amount(id)} <span aria-hidden="true">→</span></strong></button></li>`).join('')}</ul>`:`<p class="field-note">${node.entered?'A value entered directly in this working return.':'A constant or a value outside the selected activity. See the scope below.'}</p>`}` : `<p class="field-note">${result.errors.length?'Complete the inputs to see the calculation and its sources.':'This line is not used for the current return.'}</p>`}
-      <button class="secondary full" data-page="${f.page}">Open ${names[f.page]} →</button><div class="inspector-source">${link(sourceUrl)}</div><div class="privacy-note"><span aria-hidden="true">◉</span><div><strong>Your return stays here.</strong><p>Calculations and saves happen on this device. IRS links open separately without sending your entries.</p></div></div>`;
+      ${sourceReceipt(draft,selected)}<button class="secondary full" data-page="${f.page}">Open ${names[f.page]} →</button><div class="inspector-source">${link(sourceUrl)}</div><div class="privacy-note"><span aria-hidden="true">◉</span><div><strong>Your return stays here.</strong><p>Calculations and saves happen on this device. IRS links open separately without sending your entries.</p></div></div>`;
   }
   function render() {
     result = calculate(draft);
@@ -157,8 +160,9 @@ export function mountApp(root: HTMLElement, storage?: Storage) {
       <div class="scope-note"><span class="scope-badge">Limited prototype</span><p>2025 wages, plain interest/dividends, covered stock sales, capital loss carryovers and income tax before credits. Assumes standard-deduction eligibility, no dependent status, no age/blindness additions and no special tax methods. Total tax, credits and refunds remain unsupported. <strong>Not ready to file.</strong></p></div>
       ${message?`<div class="alert" role="alert">${escape(message)}</div>`:''}
       <div class="return-status ${result.errors.length?'incomplete':'complete'}"><span aria-hidden="true">${result.errors.length?'○':'✓'}</span><span>${result.errors.length?`Inputs need attention: ${escape(result.errors[0])}`:'Supported lines are calculated. Select any amount to see its source.'}</span>${result.errorSource ? `<button class="secondary" data-source="${result.errorSource}">Go to input →</button>` : ''}</div>
+      ${brokerReview && page!=='imports'?'<div class="alert">A brokerage CSV is awaiting review. Its values are not included in this return. <button class="text-button" data-page="imports">Open file review →</button></div>':''}
       ${unsupportedNotice()}
-      <article class="form-paper ${page==='1040'?'paper1040':''}" aria-label="${names[page]}">${page==='1040'?form1040():page==='scheduleB'?scheduleB():page==='qdcg'?taxWorksheet():page==='scheduleD'?scheduleD():worksheet(page)}</article>
+      <article class="form-paper ${page==='1040'?'paper1040':''}" aria-label="${names[page]}">${page==='imports'?brokerageImport(draft,brokerReview,brokerLoading):page==='1040'?form1040():page==='scheduleB'?scheduleB():page==='qdcg'?taxWorksheet():page==='scheduleD'?scheduleD():worksheet(page)}</article>
       <footer>Free & open source. Built on TelosTax’s MIT-licensed calculations. <a href="${import.meta.env.BASE_URL}third-party-notices.txt" target="_blank" rel="noopener">License notice ↗</a></footer></main>
       <aside class="inspector" aria-label="Calculation explanation">${inspector()}</aside></div>`;
   }
@@ -205,9 +209,21 @@ export function mountApp(root: HTMLElement, storage?: Storage) {
   root.addEventListener('input', e=>{ if((e.target as HTMLElement).tagName==='INPUT' && (e.target as HTMLInputElement).type!=='checkbox') onEdit(e); }, { signal });
   root.addEventListener('change', async e=>{
     const t = e.target as HTMLInputElement;
-    if(t.id==='import-file') {
+    if(t.id==='broker-file') {
+      const file=t.files?.[0];if(!file)return;
+      const request=++brokerRead;brokerReview=null;brokerLoading=true;message='';render();
+      try {
+        if(file.size>MAX_CSV_BYTES)throw new Error('CSV exceeds the 1 MB limit.');
+        const preview=parseSchwab(await file.text());const digest=await fingerprint(preview);
+        if(request!==brokerRead)return;
+        brokerReview={file:file.name,digest,preview,reviewed:false};
+      }catch(error){if(request!==brokerRead)return;message=`CSV review failed: ${error instanceof Error?error.message:'Invalid file'}. Your draft is unchanged.`;}
+      brokerLoading=false;render();
+    } else if(t.id==='broker-reviewed') {
+      if(brokerReview)brokerReview.reviewed=t.checked;render();root.querySelector<HTMLElement>('#broker-reviewed')?.focus();
+    } else if(t.id==='import-file') {
       const file = t.files?.[0]; if(!file)return;
-      try { if(file.size>200_000)throw new Error('Save file is too large.'); const imported=decode(await file.text()); draft=imported; protectSaved=false; persist(); message='Draft imported. '+saveStatus+'.'; }
+      try { if(file.size>200_000)throw new Error('Save file is too large.'); const imported=decode(await file.text()); draft=imported; brokerReview=null;brokerLoading=false;brokerRead++; protectSaved=false; persist(); message='Draft imported. '+saveStatus+'.'; }
       catch(error){ message=`Import failed: ${error instanceof Error?error.message:'Invalid file'}. Your current draft is unchanged.`; }
       render();
     } else if(t.tagName==='SELECT'||t.type==='checkbox')onEdit(e);
@@ -222,19 +238,26 @@ export function mountApp(root: HTMLElement, storage?: Storage) {
     if(button.dataset.remove){draft.sales=draft.sales.filter(s=>s.id!==button.dataset.remove);persist();render();return;}
     if(button.dataset.removeInvestment){const [kind,id]=button.dataset.removeInvestment.split(':');if(kind==='interest')draft.investments.interest=draft.investments.interest.filter(p=>p.id!==id);else draft.investments.dividends=draft.investments.dividends.filter(p=>p.id!==id);persist();render();return;}
     switch(button.dataset.action){
+      case 'discard-broker': brokerReview=null;brokerLoading=false;brokerRead++;break;
+      case 'apply-broker':
+        if(!brokerReview || brokerLoading)break;
+        if(protectSaved){message='The existing browser draft could not be read. Download a copy of your stored data or recover your JSON draft before importing brokerage records, or explicitly start a new draft.';break;}
+        try {draft=applySchwab(draft,brokerReview.preview,brokerReview.digest,brokerReview.file,brokerReview.reviewed);protectSaved=false;brokerReview=null;persist();page='scheduleB';message='Brokerage records added. Review Schedule B and answer Part III. '+saveStatus+'. Source receipts are included in draft downloads.';}
+        catch(error){message=error instanceof Error?error.message:'Import failed; draft unchanged.';}
+        break;
       case 'home': page='1040'; break;
       case 'add': draft.sales.push({id:crypto.randomUUID(),description:'Stock sale',term:'short',proceeds:'',basis:''});persist();break;
       case 'add-interest': if(draft.investments.interest.length<100)draft.investments.interest.push({id:crypto.randomUUID(),payer:'',taxable:'',exempt:'0'});persist();break;
       case 'add-dividend': if(draft.investments.dividends.length<100)draft.investments.dividends.push({id:crypto.randomUUID(),payer:'',ordinary:'',qualified:'0',capitalGain:'0'});persist();break;
-      case 'example': if(!window.confirm('Replace the current draft with a synthetic example? Download your draft first if you want to keep it.'))return;draft=exampleDraft();protectSaved=false;message='Synthetic example loaded. Replace these amounts with your own records.';persist();break;
-      case 'new': if(!window.confirm('Start a new draft? Download your current draft first if you want to keep it.'))return;draft=emptyDraft();protectSaved=false;message='New draft started.';persist();break;
+      case 'example': if(!window.confirm('Replace the current draft with a synthetic example? Download your draft first if you want to keep it.'))return;draft=exampleDraft();brokerReview=null;brokerLoading=false;brokerRead++;protectSaved=false;message='Synthetic example loaded. Replace these amounts with your own records.';persist();break;
+      case 'new': if(!window.confirm('Start a new draft? Download your current draft first if you want to keep it.'))return;draft=emptyDraft();brokerReview=null;brokerLoading=false;brokerRead++;protectSaved=false;message='New draft started.';persist();break;
       case 'download': try { const url=URL.createObjectURL(new Blob([encode(draft)],{type:'application/json'})); const a=document.createElement('a');a.href=url;a.download='opentaxforms-2025.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);message='Draft downloaded as an unencrypted JSON file.'; } catch {message='Correct invalid amounts before downloading. Blank fields may be saved.';}break;
       case 'print': window.print();return;
     }
     render();
   }, { signal });
   render();
-  return { destroy:()=>controller.abort(), getDraft:()=>structuredClone(draft) };
+  return { destroy:()=>{brokerRead++;controller.abort();}, getDraft:()=>structuredClone(draft) };
 }
 const root = document.querySelector<HTMLElement>('#app');
 if(root)mountApp(root);
